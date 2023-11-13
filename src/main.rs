@@ -1,4 +1,5 @@
 pub mod music_theory;
+pub mod track_info;
 
 use glam::{UVec2, Vec2};
 use micro::{
@@ -13,6 +14,7 @@ use micro::{
 };
 use music_theory::{Chord, TimeSignature};
 use palette::LinSrgba;
+use track_info::TrackInfo;
 
 const BASE_RESOLUTION: UVec2 = UVec2::new(3840, 2160);
 const GRID_CELL_SIZE: f32 = 48.0;
@@ -21,6 +23,7 @@ const OFFWHITE: LinSrgba = LinSrgba::new(0.8, 0.8, 0.8, 1.0);
 const PANEL_LABEL_PADDING: f32 = 16.0;
 
 fn main() {
+	dbg!(TrackInfo::from_file("test.json").unwrap());
 	micro::run(
 		ContextSettings {
 			window_mode: WindowMode::Windowed {
@@ -150,7 +153,7 @@ impl State<anyhow::Error> for MainState {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct MusicWidgetsState {
-	pub bpm: Option<u16>,
+	pub bpm: u16,
 	pub time_signature: Option<TimeSignature>,
 	pub key: Option<Chord>,
 	pub chord: Option<Chord>,

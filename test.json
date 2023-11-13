@@ -1,0 +1,13 @@
+{
+	"bpm": 135,
+	"ticks_per_beat": 4,
+	"time_signature": "4/4",
+	"key": "Eb",
+	"chord": "Abmaj7#11",
+	"changes": [
+		{
+			"tick": 8,
+			"chord": "Dbmaj7#11"
+		}
+	]
+}
