@@ -1,5 +1,8 @@
+pub mod music_theory;
+
 use glam::UVec2;
 use micro::{input::Scancode, Context, ContextSettings, Event, ScalingMode, State, WindowMode};
+use music_theory::{Chord, TimeSignature};
 use palette::LinSrgba;
 
 const BASE_RESOLUTION: UVec2 = UVec2::new(3840, 2160);
@@ -43,4 +46,12 @@ impl State<anyhow::Error> for MainState {
 		ctx.clear(LinSrgba::new(0.8, 0.8, 0.8, 1.0));
 		Ok(())
 	}
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct MusicWidgetsState {
+	pub bpm: Option<u16>,
+	pub time_signature: Option<TimeSignature>,
+	pub key: Option<Chord>,
+	pub chord: Option<Chord>,
 }
