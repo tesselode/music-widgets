@@ -1,4 +1,5 @@
 pub mod music_theory;
+pub mod music_widgets_state;
 pub mod track_info;
 
 use glam::{UVec2, Vec2};
@@ -12,7 +13,7 @@ use micro::{
 	math::{Rect, VecConstants},
 	Context, ContextSettings, Event, ScalingMode, State, WindowMode,
 };
-use music_theory::{Chord, TimeSignature};
+use music_widgets_state::MusicWidgetsState;
 use palette::LinSrgba;
 use track_info::TrackInfo;
 
@@ -23,7 +24,6 @@ const OFFWHITE: LinSrgba = LinSrgba::new(0.8, 0.8, 0.8, 1.0);
 const PANEL_LABEL_PADDING: f32 = 16.0;
 
 fn main() {
-	dbg!(TrackInfo::from_file("test.json").unwrap());
 	micro::run(
 		ContextSettings {
 			window_mode: WindowMode::Windowed {
@@ -39,13 +39,16 @@ fn main() {
 }
 
 struct MainState {
+	music_widgets_state: MusicWidgetsState,
 	small_font: Font,
 	large_font: Font,
 }
 
 impl MainState {
 	pub fn new(ctx: &mut Context) -> anyhow::Result<Self> {
+		let track_info = TrackInfo::from_file("test.json")?;
 		Ok(Self {
+			music_widgets_state: MusicWidgetsState::new(track_info),
 			small_font: Font::from_file(
 				ctx,
 				"resources/traceroute.ttf",
@@ -126,6 +129,19 @@ impl State<anyhow::Error> for MainState {
 		Ok(())
 	}
 
+	fn update(
+		&mut self,
+		_ctx: &mut Context,
+		delta_time: std::time::Duration,
+	) -> Result<(), anyhow::Error> {
+		self.music_widgets_state.update(delta_time);
+		println!(
+			"{}: {:?}",
+			self.music_widgets_state.current_tick, self.music_widgets_state.chord
+		);
+		Ok(())
+	}
+
 	fn draw(&mut self, ctx: &mut Context) -> Result<(), anyhow::Error> {
 		ctx.clear(OFFWHITE);
 		self.draw_panel(
@@ -149,14 +165,6 @@ impl State<anyhow::Error> for MainState {
 		)?;
 		Ok(())
 	}
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct MusicWidgetsState {
-	pub bpm: u16,
-	pub time_signature: Option<TimeSignature>,
-	pub key: Option<Chord>,
-	pub chord: Option<Chord>,
 }
 
 fn text_translation(text: &Text, target_position: Vec2, anchor: Vec2) -> Vec2 {

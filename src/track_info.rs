@@ -1,19 +1,20 @@
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 use serde::Deserialize;
 use thiserror::Error;
 
 use crate::music_theory::{Chord, TimeSignature};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(from = "RawTrackInfo")]
 pub struct TrackInfo {
 	pub bpm: u16,
 	pub ticks_per_beat: u16,
-	pub time_signature: Option<TimeSignature>,
-	pub key: Option<Chord>,
-	pub chord: Option<Chord>,
+	pub time_signature: TimeSignature,
+	pub key: Chord,
+	pub chord: Chord,
 	#[serde(default)]
-	pub changes: Vec<Change>,
+	pub changes: HashMap<u32, Change>,
 }
 
 impl TrackInfo {
@@ -39,4 +40,40 @@ pub struct Change {
 	pub time_signature: Option<TimeSignature>,
 	pub key: Option<Chord>,
 	pub chord: Option<Chord>,
+}
+
+#[derive(Deserialize)]
+struct RawTrackInfo {
+	bpm: u16,
+	ticks_per_beat: u16,
+	time_signature: TimeSignature,
+	key: Chord,
+	chord: Chord,
+	#[serde(default)]
+	changes: Vec<Change>,
+}
+
+impl From<RawTrackInfo> for TrackInfo {
+	fn from(
+		RawTrackInfo {
+			bpm,
+			ticks_per_beat,
+			time_signature,
+			key,
+			chord,
+			mut changes,
+		}: RawTrackInfo,
+	) -> Self {
+		TrackInfo {
+			bpm,
+			ticks_per_beat,
+			time_signature,
+			key,
+			chord,
+			changes: changes
+				.drain(..)
+				.map(|change| (change.tick, change))
+				.collect(),
+		}
+	}
 }
