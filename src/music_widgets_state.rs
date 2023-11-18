@@ -8,13 +8,14 @@ use crate::{
 #[derive(Debug, Clone, PartialEq)]
 pub struct MusicWidgetsState {
 	pub track_info: TrackInfo,
-	pub bpm: u16,
-	pub ticks_per_beat: u16,
+	pub bpm: u32,
+	pub ticks_per_beat: u32,
 	pub time_signature: TimeSignature,
 	pub key: Chord,
 	pub chord: Chord,
 	pub current_tick: u32,
 	pub time_since_last_tick: Duration,
+	pub last_time_signature_change_tick: u32,
 }
 
 impl MusicWidgetsState {
@@ -28,6 +29,7 @@ impl MusicWidgetsState {
 			current_tick: 0,
 			time_since_last_tick: Duration::ZERO,
 			track_info,
+			last_time_signature_change_tick: 0,
 		}
 	}
 
@@ -50,6 +52,7 @@ impl MusicWidgetsState {
 				}
 				if let Some(new_time_signature) = time_signature {
 					self.time_signature = *new_time_signature;
+					self.last_time_signature_change_tick = self.current_tick;
 				}
 				if let Some(new_key) = key {
 					self.key = new_key.clone();
@@ -59,6 +62,11 @@ impl MusicWidgetsState {
 				}
 			}
 		}
+	}
+
+	pub fn current_beat(&self) -> u32 {
+		((self.current_tick - self.last_time_signature_change_tick) / self.ticks_per_beat)
+			% self.time_signature.top
 	}
 
 	fn tick_duration(&self) -> Duration {

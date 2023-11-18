@@ -5,8 +5,14 @@ use thiserror::Error;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
 #[serde(try_from = "&str")]
 pub struct TimeSignature {
-	pub top: u8,
-	pub bottom: u8,
+	pub top: u32,
+	pub bottom: u32,
+}
+
+impl ToString for TimeSignature {
+	fn to_string(&self) -> String {
+		format!("{}/{}", self.top, self.bottom)
+	}
 }
 
 impl TryFrom<&str> for TimeSignature {

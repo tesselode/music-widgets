@@ -1,13 +1,15 @@
+mod beat_indicator;
 pub mod music_theory;
 pub mod music_widgets_state;
 pub mod track_info;
 
+use beat_indicator::draw_beat_indicator;
 use glam::{UVec2, Vec2};
 use micro::{
 	graphics::{
 		mesh::{Mesh, ShapeStyle},
 		text::{Font, FontSettings, LayoutSettings, Text},
-		ColorConstants, DrawParams,
+		ColorConstants, DrawParams, StencilAction, StencilTest,
 	},
 	input::Scancode,
 	math::{Rect, VecConstants},
@@ -112,7 +114,90 @@ impl MainState {
 			ctx,
 			DrawParams::new().translated(text_position).color(OFFWHITE),
 		);
-		content(ctx, grid_bounds)?;
+		ctx.clear_stencil();
+		ctx.write_to_stencil(StencilAction::Replace(1), |ctx| -> anyhow::Result<()> {
+			Mesh::simple_polygon(
+				ctx,
+				ShapeStyle::Fill,
+				polygon_grid_points
+					.iter()
+					.map(|point| *point * GRID_CELL_SIZE),
+				LinSrgba::BLACK,
+			)?
+			.draw(ctx, DrawParams::new());
+			Ok(())
+		})?;
+		ctx.with_stencil(StencilTest::Equal, 1, |ctx| -> anyhow::Result<()> {
+			content(ctx, grid_bounds)?;
+			Ok(())
+		})?;
+		Ok(())
+	}
+
+	fn draw_bpm_panel(&mut self, ctx: &mut Context, position: Vec2) -> Result<(), anyhow::Error> {
+		self.draw_panel(
+			ctx,
+			"bpm",
+			Rect::new(position, Vec2::new(12.0, 4.0)),
+			|ctx, grid_bounds| {
+				let text = Text::new(
+					ctx,
+					&self.large_font,
+					&self.music_widgets_state.bpm.to_string(),
+					LayoutSettings::default(),
+				);
+				text.draw(
+					ctx,
+					DrawParams::new()
+						.translated(text_translation(
+							&text,
+							grid_bounds.center() * GRID_CELL_SIZE,
+							Vec2::splat(0.5),
+						))
+						.color(LinSrgba::BLACK),
+				);
+				Ok(())
+			},
+		)?;
+		Ok(())
+	}
+
+	fn draw_metronome_panel(
+		&mut self,
+		ctx: &mut Context,
+		position: Vec2,
+	) -> Result<(), anyhow::Error> {
+		self.draw_panel(
+			ctx,
+			"metronome",
+			Rect::new(position, Vec2::new(12.0, 5.0)),
+			|ctx, grid_bounds| {
+				let text_region = grid_bounds.resized_y(4.0, 0.0);
+				let text = Text::new(
+					ctx,
+					&self.large_font,
+					&self.music_widgets_state.time_signature.to_string(),
+					LayoutSettings::default(),
+				);
+				text.draw(
+					ctx,
+					DrawParams::new()
+						.translated(text_translation(
+							&text,
+							text_region.center() * GRID_CELL_SIZE,
+							Vec2::splat(0.5),
+						))
+						.color(LinSrgba::BLACK),
+				);
+				draw_beat_indicator(
+					ctx,
+					grid_bounds.resized_y(1.0, 1.0),
+					self.music_widgets_state.time_signature,
+					self.music_widgets_state.current_beat(),
+				)?;
+				Ok(())
+			},
+		)?;
 		Ok(())
 	}
 }
@@ -135,34 +220,13 @@ impl State<anyhow::Error> for MainState {
 		delta_time: std::time::Duration,
 	) -> Result<(), anyhow::Error> {
 		self.music_widgets_state.update(delta_time);
-		println!(
-			"{}: {:?}",
-			self.music_widgets_state.current_tick, self.music_widgets_state.chord
-		);
 		Ok(())
 	}
 
 	fn draw(&mut self, ctx: &mut Context) -> Result<(), anyhow::Error> {
 		ctx.clear(OFFWHITE);
-		self.draw_panel(
-			ctx,
-			"bpm",
-			Rect::from_xywh(1.0, 1.0, 12.0, 4.0),
-			|ctx, grid_bounds| {
-				let text = Text::new(ctx, &self.large_font, "135", LayoutSettings::default());
-				text.draw(
-					ctx,
-					DrawParams::new()
-						.translated(text_translation(
-							&text,
-							grid_bounds.center() * GRID_CELL_SIZE,
-							Vec2::splat(0.5),
-						))
-						.color(LinSrgba::BLACK),
-				);
-				Ok(())
-			},
-		)?;
+		self.draw_bpm_panel(ctx, Vec2::new(1.0, 1.0))?;
+		self.draw_metronome_panel(ctx, Vec2::new(1.0, 7.0))?;
 		Ok(())
 	}
 }

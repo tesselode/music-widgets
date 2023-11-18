@@ -8,8 +8,8 @@ use crate::music_theory::{Chord, TimeSignature};
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(from = "RawTrackInfo")]
 pub struct TrackInfo {
-	pub bpm: u16,
-	pub ticks_per_beat: u16,
+	pub bpm: u32,
+	pub ticks_per_beat: u32,
 	pub time_signature: TimeSignature,
 	pub key: Chord,
 	pub chord: Chord,
@@ -36,7 +36,7 @@ pub enum TrackInfoFromFileError {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize)]
 pub struct Change {
 	pub tick: u32,
-	pub bpm: Option<u16>,
+	pub bpm: Option<u32>,
 	pub time_signature: Option<TimeSignature>,
 	pub key: Option<Chord>,
 	pub chord: Option<Chord>,
@@ -44,8 +44,8 @@ pub struct Change {
 
 #[derive(Deserialize)]
 struct RawTrackInfo {
-	bpm: u16,
-	ticks_per_beat: u16,
+	bpm: u32,
+	ticks_per_beat: u32,
 	time_signature: TimeSignature,
 	key: Chord,
 	chord: Chord,
