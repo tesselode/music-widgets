@@ -3,6 +3,12 @@ pub mod music_theory;
 pub mod music_widgets_state;
 pub mod track_info;
 
+use std::{
+	io::Write,
+	process::{Child, Command, Stdio},
+	time::Duration,
+};
+
 use beat_indicator::draw_beat_indicator;
 use glam::{UVec2, Vec2};
 use micro::{
@@ -40,6 +46,8 @@ fn main() {
 struct MainState {
 	canvas: Canvas,
 	resources: MusicWidgetResources,
+	canvas_read_buffer: Vec<u8>,
+	ffmpeg_process: Child,
 }
 
 impl MainState {
@@ -66,6 +74,33 @@ impl MainState {
 					},
 				)?,
 			},
+			canvas_read_buffer: vec![0; (BASE_RESOLUTION.x * BASE_RESOLUTION.y * 4) as usize],
+			ffmpeg_process: Command::new("ffmpeg")
+				.stdin(Stdio::piped())
+				.arg("-y")
+				.arg("-f")
+				.arg("rawvideo")
+				.arg("-vcodec")
+				.arg("rawvideo")
+				.arg("-s")
+				.arg(&format!("{}x{}", BASE_RESOLUTION.x, BASE_RESOLUTION.y))
+				.arg("-pix_fmt")
+				.arg("rgba")
+				.arg("-r")
+				.arg("60")
+				.arg("-i")
+				.arg("-")
+				.arg("-i")
+				.arg("continuum.flac")
+				.arg("-b:a")
+				.arg("264k")
+				.arg("-c:v")
+				.arg("libx264")
+				.arg("-r")
+				.arg("60")
+				.arg("-shortest")
+				.arg("test.mp4")
+				.spawn()?,
 		})
 	}
 }
@@ -87,7 +122,10 @@ impl State<anyhow::Error> for MainState {
 		_ctx: &mut Context,
 		delta_time: std::time::Duration,
 	) -> Result<(), anyhow::Error> {
-		self.resources.music_widgets_state.update(delta_time);
+		self.resources
+			.music_widgets_state
+			.update(Duration::from_secs_f64(1.0 / 60.0));
+		self.canvas.read(&mut self.canvas_read_buffer);
 		Ok(())
 	}
 
@@ -102,6 +140,11 @@ impl State<anyhow::Error> for MainState {
 			ctx,
 			DrawParams::new().scaled(ctx.window_size().as_vec2() / self.canvas.size().as_vec2()),
 		);
+		self.ffmpeg_process
+			.stdin
+			.as_mut()
+			.unwrap()
+			.write_all(&self.canvas_read_buffer)?;
 		Ok(())
 	}
 }
