@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.75"
 glam = "0.24.2"
-micro = { git = "https://github.com/tesselode/micro", rev = "974bb3f" }
+micro = { git = "https://github.com/tesselode/micro", rev = "ec55f22" }
 palette = "0.7.3"
 regex = "1.10.2"
 serde = { version = "1.0.192", features = ["derive"] }
