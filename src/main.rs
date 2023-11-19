@@ -1,3 +1,4 @@
+mod format;
 mod music_state;
 mod music_theory;
 mod project;
@@ -11,8 +12,10 @@ use std::{
 };
 
 use clap::Parser;
-use egui::TopBottomPanel;
+use egui::{Slider, TopBottomPanel};
+use format::{format_time, parse_time};
 use glam::{UVec2, Vec2};
+use kira::sound::static_sound::{StaticSoundData, StaticSoundSettings};
 use micro::{
 	graphics::{
 		mesh::Mesh,
@@ -52,6 +55,7 @@ fn main() {
 
 struct MainState {
 	loaded_project: Option<LoadedProject>,
+	playing: bool,
 	time_elapsed: Duration,
 	fonts: Fonts,
 	canvas: Canvas,
@@ -67,6 +71,7 @@ impl MainState {
 				.project_path
 				.map(|project_path| LoadedProject::load(ctx, project_path))
 				.transpose()?,
+			playing: false,
 			time_elapsed: Duration::ZERO,
 			fonts: Fonts {
 				small: Font::from_file(
@@ -120,7 +125,7 @@ impl MainState {
 
 impl State<anyhow::Error> for MainState {
 	fn ui(&mut self, ctx: &mut Context, egui_ctx: &egui::Context) -> Result<(), anyhow::Error> {
-		TopBottomPanel::top("main_menu").show(egui_ctx, |ui| {
+		TopBottomPanel::bottom("main_menu").show(egui_ctx, |ui| {
 			egui::menu::bar(ui, |ui| {
 				if ui.button("Load").clicked() {
 					if let Some(project_path) = FileDialog::new()
@@ -129,7 +134,11 @@ impl State<anyhow::Error> for MainState {
 						.pick_file()
 					{
 						match LoadedProject::load(ctx, project_path) {
-							Ok(loaded_project) => self.loaded_project = Some(loaded_project),
+							Ok(loaded_project) => {
+								self.loaded_project = Some(loaded_project);
+								self.playing = false;
+								self.time_elapsed = Duration::ZERO;
+							}
 							Err(err) => {
 								MessageDialog::new()
 									.set_level(MessageLevel::Error)
@@ -137,6 +146,21 @@ impl State<anyhow::Error> for MainState {
 									.show();
 							}
 						}
+					}
+				}
+				if let Some(LoadedProject { sound_data, .. }) = &self.loaded_project {
+					ui.checkbox(&mut self.playing, "Playing");
+					let mut time_elapsed_f64 = self.time_elapsed.as_secs_f64();
+					let position_slider = Slider::new(
+						&mut time_elapsed_f64,
+						0.0..=sound_data.duration().as_secs_f64(),
+					)
+					.trailing_fill(true)
+					.custom_formatter(format_time)
+					.custom_parser(parse_time);
+					ui.style_mut().spacing.slider_width = 200.0;
+					if ui.add(position_slider).changed() {
+						self.time_elapsed = Duration::from_secs_f64(time_elapsed_f64);
 					}
 				}
 			});
@@ -156,7 +180,9 @@ impl State<anyhow::Error> for MainState {
 	}
 
 	fn update(&mut self, ctx: &mut Context, delta_time: Duration) -> Result<(), anyhow::Error> {
-		self.time_elapsed += delta_time;
+		if self.playing {
+			self.time_elapsed += delta_time;
+		}
 		if let Some(LoadedProject {
 			shader: Some(loaded_shader),
 			..
@@ -178,7 +204,10 @@ impl State<anyhow::Error> for MainState {
 	fn draw(&mut self, ctx: &mut Context) -> Result<(), anyhow::Error> {
 		self.canvas.render_to(ctx, |ctx| -> anyhow::Result<()> {
 			ctx.clear(OFFWHITE);
-			if let Some(LoadedProject { shader, track_info }) = &self.loaded_project {
+			if let Some(LoadedProject {
+				shader, track_info, ..
+			}) = &self.loaded_project
+			{
 				if let Some(LoadedShader { shader, .. }) = shader {
 					Mesh::rectangle(ctx, Rect::new(Vec2::ZERO, BASE_RESOLUTION.as_vec2()))
 						.draw(ctx, shader);
@@ -220,6 +249,7 @@ struct Fonts {
 }
 
 struct LoadedProject {
+	sound_data: StaticSoundData,
 	shader: Option<LoadedShader>,
 	track_info: TrackInfo,
 }
@@ -228,6 +258,7 @@ impl LoadedProject {
 	fn load(ctx: &mut Context, project_path: impl AsRef<Path>) -> anyhow::Result<Self> {
 		let project_path = project_path.as_ref();
 		let project = Project::from_file(project_path)?;
+		let audio_path = project_path.parent().unwrap().join(project.audio_file_path);
 		let shader = project
 			.shader_path
 			.map(|shader_path| {
@@ -236,6 +267,7 @@ impl LoadedProject {
 			})
 			.transpose()?;
 		Ok(Self {
+			sound_data: StaticSoundData::from_file(audio_path, StaticSoundSettings::default())?,
 			shader,
 			track_info: TrackInfo::new(&project.track_info),
 		})
