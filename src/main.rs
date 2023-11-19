@@ -17,7 +17,11 @@ use clap::Parser;
 use egui::{ProgressBar, Slider, TopBottomPanel};
 use format::{format_time, parse_time};
 use glam::{UVec2, Vec2};
-use kira::sound::static_sound::{StaticSoundData, StaticSoundSettings};
+use kira::{
+	manager::{AudioManager, AudioManagerSettings},
+	sound::static_sound::{StaticSoundData, StaticSoundHandle, StaticSoundSettings},
+	tween::Tween,
+};
 use micro::{
 	graphics::{
 		mesh::Mesh,
@@ -91,7 +95,8 @@ impl MainState {
 			},
 			canvas: Canvas::new(ctx, BASE_RESOLUTION, CanvasSettings::default()),
 			mode: Mode::Live {
-				playing: false,
+				audio_manager: AudioManager::new(AudioManagerSettings::default())?,
+				playing_sound: None,
 				time_elapsed: Duration::ZERO,
 			},
 		})
@@ -147,6 +152,16 @@ impl MainState {
 		};
 		Ok(())
 	}
+
+	fn switch_to_live_mode(&mut self, ctx: &mut Context) -> Result<(), anyhow::Error> {
+		ctx.set_swap_interval(SwapInterval::VSync)?;
+		self.mode = Mode::Live {
+			audio_manager: AudioManager::new(AudioManagerSettings::default())?,
+			playing_sound: None,
+			time_elapsed: Duration::ZERO,
+		};
+		Ok(())
+	}
 }
 
 impl State<anyhow::Error> for MainState {
@@ -154,8 +169,10 @@ impl State<anyhow::Error> for MainState {
 		TopBottomPanel::bottom("main_menu").show(egui_ctx, |ui| {
 			egui::menu::bar(ui, |ui| match &mut self.mode {
 				Mode::Live {
-					playing,
+					audio_manager,
+					playing_sound,
 					time_elapsed,
+					..
 				} => {
 					if ui.button("Load").clicked() {
 						if let Some(project_path) = FileDialog::new()
@@ -166,7 +183,12 @@ impl State<anyhow::Error> for MainState {
 							match LoadedProject::load(ctx, project_path) {
 								Ok(loaded_project) => {
 									self.loaded_project = Some(loaded_project);
-									*playing = false;
+									if let Some(playing_sound) = playing_sound {
+										playing_sound
+											.stop(Tween::default())
+											.expect("error stopping audio");
+									}
+									*playing_sound = None;
 									*time_elapsed = Duration::ZERO;
 								}
 								Err(err) => {
@@ -180,7 +202,17 @@ impl State<anyhow::Error> for MainState {
 					}
 					let render_button_clicked = ui.button("Render").clicked();
 					if let Some(LoadedProject { sound_data, .. }) = &self.loaded_project {
-						ui.checkbox(&mut *playing, "Playing");
+						let mut playing = playing_sound.is_some();
+						if ui.checkbox(&mut playing, "Playing").changed() {
+							set_playing(
+								playing,
+								playing_sound,
+								audio_manager,
+								sound_data,
+								time_elapsed,
+							)
+							.expect("error changing audio playback state");
+						}
 						let mut time_elapsed_f64 = time_elapsed.as_secs_f64();
 						let position_slider = Slider::new(
 							&mut time_elapsed_f64,
@@ -190,8 +222,19 @@ impl State<anyhow::Error> for MainState {
 						.custom_formatter(format_time)
 						.custom_parser(parse_time);
 						ui.style_mut().spacing.slider_width = 200.0;
-						if ui.add(position_slider).changed() {
+						let position_slider_response = &ui.add(position_slider);
+						if position_slider_response.changed() {
 							*time_elapsed = Duration::from_secs_f64(time_elapsed_f64);
+							if position_slider_response.drag_released() {
+								if let Some(playing_sound) = playing_sound {
+									playing_sound
+										.set_playback_region(..)
+										.expect("error seeking audio");
+									playing_sound
+										.seek_to(time_elapsed_f64)
+										.expect("error seeking audio");
+								}
+							}
 						}
 					}
 					if render_button_clicked {
@@ -225,11 +268,7 @@ impl State<anyhow::Error> for MainState {
 					ui.label(format!("Rendering ({}/{})", *current_frame, total_frames));
 					if ui.button("Cancel").clicked() {
 						ffmpeg_process.kill().ok();
-						ctx.set_swap_interval(SwapInterval::VSync).unwrap();
-						self.mode = Mode::Live {
-							playing: false,
-							time_elapsed: Duration::ZERO,
-						};
+						self.switch_to_live_mode(ctx).unwrap();
 					}
 				}
 			});
@@ -251,11 +290,12 @@ impl State<anyhow::Error> for MainState {
 	fn update(&mut self, ctx: &mut Context, delta_time: Duration) -> Result<(), anyhow::Error> {
 		let time_elapsed = self.time_elapsed();
 		if let Mode::Live {
-			playing,
+			playing_sound,
 			time_elapsed,
+			..
 		} = &mut self.mode
 		{
-			if *playing {
+			if playing_sound.is_some() {
 				*time_elapsed += delta_time;
 			}
 		}
@@ -327,11 +367,7 @@ impl State<anyhow::Error> for MainState {
 				.write_all(canvas_read_buffer)
 				.is_err()
 			{
-				ctx.set_swap_interval(SwapInterval::VSync)?;
-				self.mode = Mode::Live {
-					playing: false,
-					time_elapsed: Duration::ZERO,
-				};
+				self.switch_to_live_mode(ctx)?;
 			} else {
 				*current_frame += 1;
 			}
@@ -342,7 +378,8 @@ impl State<anyhow::Error> for MainState {
 
 enum Mode {
 	Live {
-		playing: bool,
+		audio_manager: AudioManager,
+		playing_sound: Option<StaticSoundHandle>,
 		time_elapsed: Duration,
 	},
 	Rendering {
@@ -421,4 +458,24 @@ impl LoadedShader {
 		}
 		Ok(())
 	}
+}
+
+fn set_playing(
+	playing: bool,
+	playing_sound: &mut Option<StaticSoundHandle>,
+	audio_manager: &mut AudioManager,
+	sound_data: &StaticSoundData,
+	time_elapsed: &mut Duration,
+) -> anyhow::Result<()> {
+	if playing {
+		*playing_sound = Some(audio_manager.play(
+			sound_data.with_modified_settings(|s| s.playback_region(time_elapsed.as_secs_f64()..)),
+		)?);
+	} else {
+		if let Some(playing_sound) = playing_sound {
+			playing_sound.stop(Tween::default())?;
+		}
+		*playing_sound = None;
+	}
+	Ok(())
 }
