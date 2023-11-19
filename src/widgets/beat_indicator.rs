@@ -9,7 +9,9 @@ use micro::{
 };
 use palette::LinSrgba;
 
-use crate::{music_theory::TimeSignature, GRID_CELL_SIZE, STROKE_WIDTH};
+use crate::music_theory::TimeSignature;
+
+use super::{GRID_CELL_SIZE, STROKE_WIDTH};
 
 pub fn draw_beat_indicator(
 	ctx: &mut Context,
