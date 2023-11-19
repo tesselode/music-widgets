@@ -1,79 +1,55 @@
-use std::{collections::HashMap, path::Path};
+use std::time::Duration;
 
-use serde::Deserialize;
-use thiserror::Error;
+use crate::{music_state::MusicState, user_track_info::UserTrackInfo};
 
-use crate::music_theory::{Chord, TimeSignature};
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(from = "RawTrackInfo")]
 pub struct TrackInfo {
-	pub bpm: u32,
-	pub ticks_per_beat: u32,
-	pub time_signature: TimeSignature,
-	pub key: Chord,
-	pub chord: Chord,
-	#[serde(default)]
-	pub changes: HashMap<u32, Change>,
+	pub music_states: Vec<TimestampedMusicState>,
 }
 
 impl TrackInfo {
-	pub fn from_file(path: impl AsRef<Path>) -> Result<Self, TrackInfoFromFileError> {
-		let track_info_string = std::fs::read_to_string(path)?;
-		let track_info = serde_json::from_str(&track_info_string)?;
-		Ok(track_info)
-	}
-}
-
-#[derive(Debug, Error)]
-pub enum TrackInfoFromFileError {
-	#[error("{0}")]
-	IoError(#[from] std::io::Error),
-	#[error("{0}")]
-	ParseError(#[from] serde_json::Error),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize)]
-pub struct Change {
-	pub tick: u32,
-	pub bpm: Option<u32>,
-	pub time_signature: Option<TimeSignature>,
-	pub key: Option<Chord>,
-	pub chord: Option<Chord>,
-}
-
-#[derive(Deserialize)]
-struct RawTrackInfo {
-	bpm: u32,
-	ticks_per_beat: u32,
-	time_signature: TimeSignature,
-	key: Chord,
-	chord: Chord,
-	#[serde(default)]
-	changes: Vec<Change>,
-}
-
-impl From<RawTrackInfo> for TrackInfo {
-	fn from(
-		RawTrackInfo {
-			bpm,
-			ticks_per_beat,
-			time_signature,
-			key,
-			chord,
-			mut changes,
-		}: RawTrackInfo,
-	) -> Self {
-		TrackInfo {
-			bpm,
-			ticks_per_beat,
-			time_signature,
-			key,
-			chord,
-			changes: changes
-				.drain(..)
-				.map(|change| (change.tick, change))
-				.collect(),
+	pub fn new(user_track_info: &UserTrackInfo) -> Self {
+		let mut music_states = vec![TimestampedMusicState {
+			timestamp: Duration::ZERO,
+			music_state: user_track_info.initial_state.clone(),
+		}];
+		let mut bpm = music_states[0].music_state.bpm;
+		let mut last_state_timestamp = Duration::ZERO;
+		for change in &user_track_info.changes {
+			let timestamp = last_state_timestamp
+				+ change.after * tick_duration(bpm, user_track_info.ticks_per_beat);
+			let new_state = music_states.last().unwrap().music_state.changed(change);
+			bpm = new_state.bpm;
+			last_state_timestamp = timestamp;
+			music_states.push(TimestampedMusicState {
+				timestamp,
+				music_state: new_state,
+			});
 		}
+		Self { music_states }
 	}
+
+	pub fn music_state(&self, timestamp: Duration) -> &TimestampedMusicState {
+		self.music_states
+			.iter()
+			.rev()
+			.find(|state| state.timestamp <= timestamp)
+			.unwrap()
+	}
+
+	pub fn current_beat(&self, timestamp: Duration) -> f64 {
+		let state = self.music_state(timestamp);
+		let beats_per_second = state.music_state.bpm / 60.0;
+		let total_beats_elapsed = (timestamp - state.timestamp).as_secs_f64() * beats_per_second;
+		total_beats_elapsed % state.music_state.time_signature.top as f64
+	}
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimestampedMusicState {
+	pub timestamp: Duration,
+	pub music_state: MusicState,
+}
+
+fn tick_duration(bpm: f64, ticks_per_beat: u32) -> Duration {
+	Duration::from_secs_f64(60.0 / bpm / ticks_per_beat as f64)
 }

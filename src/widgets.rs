@@ -1,5 +1,7 @@
 mod beat_indicator;
 
+use std::time::Duration;
+
 use glam::Vec2;
 use micro::{
 	graphics::{
@@ -12,7 +14,7 @@ use micro::{
 };
 use palette::LinSrgba;
 
-use crate::{MusicWidgetResources, OFFWHITE};
+use crate::{track_info::TrackInfo, MusicWidgetResources, OFFWHITE};
 
 use self::beat_indicator::draw_beat_indicator;
 
@@ -86,6 +88,8 @@ pub(super) fn draw_panel(
 
 pub(super) fn draw_bpm_panel(
 	ctx: &mut Context,
+	track_info: &TrackInfo,
+	timestamp: Duration,
 	resources: &MusicWidgetResources,
 	position: Vec2,
 ) -> Result<(), anyhow::Error> {
@@ -98,7 +102,11 @@ pub(super) fn draw_bpm_panel(
 			let text = Text::new(
 				ctx,
 				&resources.large_font,
-				&resources.music_widgets_state.bpm.to_string(),
+				&track_info
+					.music_state(timestamp)
+					.music_state
+					.bpm
+					.to_string(),
 				LayoutSettings::default(),
 			);
 			text.draw(
@@ -119,6 +127,8 @@ pub(super) fn draw_bpm_panel(
 
 pub(super) fn draw_metronome_panel(
 	ctx: &mut Context,
+	track_info: &TrackInfo,
+	timestamp: Duration,
 	resources: &MusicWidgetResources,
 	position: Vec2,
 ) -> Result<(), anyhow::Error> {
@@ -132,7 +142,11 @@ pub(super) fn draw_metronome_panel(
 			let text = Text::new(
 				ctx,
 				&resources.large_font,
-				&resources.music_widgets_state.time_signature.to_string(),
+				&track_info
+					.music_state(timestamp)
+					.music_state
+					.time_signature
+					.to_string(),
 				LayoutSettings::default(),
 			);
 			text.draw(
@@ -148,8 +162,8 @@ pub(super) fn draw_metronome_panel(
 			draw_beat_indicator(
 				ctx,
 				grid_bounds.resized_y(1.0, 1.0),
-				resources.music_widgets_state.time_signature,
-				resources.music_widgets_state.current_beat(),
+				track_info.music_state(timestamp).music_state.time_signature,
+				track_info.current_beat(timestamp) as u32,
 			)?;
 			Ok(())
 		},

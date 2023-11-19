@@ -1,6 +1,7 @@
+mod music_state;
 mod music_theory;
-mod music_widgets_state;
 mod track_info;
+mod user_track_info;
 mod widgets;
 
 use std::time::Duration;
@@ -17,9 +18,9 @@ use micro::{
 	math::Rect,
 	Context, ContextSettings, Event, State, WindowMode,
 };
-use music_widgets_state::MusicWidgetsState;
 use palette::LinSrgba;
 use track_info::TrackInfo;
+use user_track_info::UserTrackInfo;
 use widgets::{draw_bpm_panel, draw_metronome_panel};
 
 const BASE_RESOLUTION: UVec2 = UVec2::new(3840, 2160);
@@ -39,20 +40,22 @@ fn main() {
 
 struct MainState {
 	canvas: Canvas,
+	track_info: TrackInfo,
+	time_elapsed: Duration,
 	resources: MusicWidgetResources,
 	canvas_read_buffer: Vec<u8>,
 	// ffmpeg_process: Child,
-	time: f32,
 	shader: Shader,
 }
 
 impl MainState {
 	pub fn new(ctx: &mut Context) -> anyhow::Result<Self> {
-		let track_info = TrackInfo::from_file("tracks/test.json")?;
+		let track_info = TrackInfo::new(&UserTrackInfo::from_file("tracks/test.json")?);
 		Ok(Self {
 			canvas: Canvas::new(ctx, BASE_RESOLUTION, CanvasSettings::default()),
+			track_info,
+			time_elapsed: Duration::ZERO,
 			resources: MusicWidgetResources {
-				music_widgets_state: MusicWidgetsState::new(track_info),
 				small_font: Font::from_file(
 					ctx,
 					"resources/traceroute.ttf",
@@ -97,7 +100,6 @@ impl MainState {
 			.arg("-shortest")
 			.arg("test.mp4")
 			.spawn()?, */
-			time: 0.0,
 			shader: Shader::from_fragment_str(ctx, include_str!("../infloresce.glsl"))?,
 		})
 	}
@@ -120,13 +122,11 @@ impl State<anyhow::Error> for MainState {
 		_ctx: &mut Context,
 		delta_time: std::time::Duration,
 	) -> Result<(), anyhow::Error> {
-		self.time += delta_time.as_secs_f32();
-		self.shader.send_f32("iTime", self.time)?;
+		self.time_elapsed += delta_time;
+		self.shader
+			.send_f32("iTime", self.time_elapsed.as_secs_f32())?;
 		self.shader
 			.send_vec2("iResolution", BASE_RESOLUTION.as_vec2())?;
-		self.resources
-			.music_widgets_state
-			.update(Duration::from_secs_f64(1.0 / 60.0));
 		Ok(())
 	}
 
@@ -135,8 +135,20 @@ impl State<anyhow::Error> for MainState {
 			ctx.clear(OFFWHITE);
 			Mesh::rectangle(ctx, Rect::new(Vec2::ZERO, BASE_RESOLUTION.as_vec2()))
 				.draw(ctx, &self.shader);
-			draw_bpm_panel(ctx, &self.resources, Vec2::new(1.0, 1.0))?;
-			draw_metronome_panel(ctx, &self.resources, Vec2::new(1.0, 7.0))?;
+			draw_bpm_panel(
+				ctx,
+				&self.track_info,
+				self.time_elapsed,
+				&self.resources,
+				Vec2::new(1.0, 1.0),
+			)?;
+			draw_metronome_panel(
+				ctx,
+				&self.track_info,
+				self.time_elapsed,
+				&self.resources,
+				Vec2::new(1.0, 7.0),
+			)?;
 			Ok(())
 		})?;
 		self.canvas.draw(
@@ -154,7 +166,6 @@ impl State<anyhow::Error> for MainState {
 }
 
 struct MusicWidgetResources {
-	music_widgets_state: MusicWidgetsState,
 	small_font: Font,
 	large_font: Font,
 }
