@@ -125,7 +125,6 @@ impl State<anyhow::Error> for MainState {
 		self.resources
 			.music_widgets_state
 			.update(Duration::from_secs_f64(1.0 / 60.0));
-		self.canvas.read(&mut self.canvas_read_buffer);
 		Ok(())
 	}
 
@@ -140,6 +139,7 @@ impl State<anyhow::Error> for MainState {
 			ctx,
 			DrawParams::new().scaled(ctx.window_size().as_vec2() / self.canvas.size().as_vec2()),
 		);
+		self.canvas.read(&mut self.canvas_read_buffer);
 		self.ffmpeg_process
 			.stdin
 			.as_mut()
