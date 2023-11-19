@@ -14,7 +14,7 @@ use micro::{
 };
 use palette::LinSrgba;
 
-use crate::{track_info::TrackInfo, MusicWidgetResources, OFFWHITE};
+use crate::{track_info::TrackInfo, Fonts, OFFWHITE};
 
 use self::beat_indicator::draw_beat_indicator;
 
@@ -24,7 +24,7 @@ const PANEL_LABEL_PADDING: f32 = 16.0;
 
 pub(super) fn draw_panel(
 	ctx: &mut Context,
-	resources: &MusicWidgetResources,
+	fonts: &Fonts,
 	title: &str,
 	grid_bounds: Rect,
 	mut content: impl FnMut(&mut Context, Rect) -> anyhow::Result<()>,
@@ -46,7 +46,7 @@ pub(super) fn draw_panel(
 		LinSrgba::BLACK,
 	)?
 	.draw(ctx, DrawParams::new());
-	let text = Text::new(ctx, &resources.small_font, title, LayoutSettings::default());
+	let text = Text::new(ctx, &fonts.small, title, LayoutSettings::default());
 	let text_position = text_translation(
 		&text,
 		(grid_bounds.top_left + Vec2::RIGHT * 1.5) * GRID_CELL_SIZE,
@@ -90,18 +90,18 @@ pub(super) fn draw_bpm_panel(
 	ctx: &mut Context,
 	track_info: &TrackInfo,
 	timestamp: Duration,
-	resources: &MusicWidgetResources,
+	fonts: &Fonts,
 	position: Vec2,
 ) -> Result<(), anyhow::Error> {
 	draw_panel(
 		ctx,
-		resources,
+		fonts,
 		"bpm",
 		Rect::new(position, Vec2::new(12.0, 4.0)),
 		|ctx, grid_bounds| {
 			let text = Text::new(
 				ctx,
-				&resources.large_font,
+				&fonts.large,
 				&track_info
 					.music_state(timestamp)
 					.music_state
@@ -129,19 +129,19 @@ pub(super) fn draw_metronome_panel(
 	ctx: &mut Context,
 	track_info: &TrackInfo,
 	timestamp: Duration,
-	resources: &MusicWidgetResources,
+	fonts: &Fonts,
 	position: Vec2,
 ) -> Result<(), anyhow::Error> {
 	draw_panel(
 		ctx,
-		resources,
+		fonts,
 		"metronome",
 		Rect::new(position, Vec2::new(12.0, 5.0)),
 		|ctx, grid_bounds| {
 			let text_region = grid_bounds.resized_y(4.0, 0.0);
 			let text = Text::new(
 				ctx,
-				&resources.large_font,
+				&fonts.large,
 				&track_info
 					.music_state(timestamp)
 					.music_state

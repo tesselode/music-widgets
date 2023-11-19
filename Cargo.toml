@@ -7,10 +7,12 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.75"
+egui = "0.23.0"
 glam = "0.24.2"
 micro = { git = "https://github.com/tesselode/micro", rev = "3c9c0c7" }
 palette = "0.7.3"
 regex = "1.10.2"
+rfd = "0.12.1"
 serde = { version = "1.0.192", features = ["derive"] }
 serde_json = "1.0.108"
 
