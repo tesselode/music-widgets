@@ -7,7 +7,7 @@ mod widgets;
 
 use std::{
 	path::{Path, PathBuf},
-	time::Duration,
+	time::{Duration, SystemTime},
 };
 
 use clap::Parser;
@@ -155,18 +155,22 @@ impl State<anyhow::Error> for MainState {
 		Ok(())
 	}
 
-	fn update(
-		&mut self,
-		_ctx: &mut Context,
-		delta_time: std::time::Duration,
-	) -> Result<(), anyhow::Error> {
+	fn update(&mut self, ctx: &mut Context, delta_time: Duration) -> Result<(), anyhow::Error> {
 		self.time_elapsed += delta_time;
 		if let Some(LoadedProject {
-			shader: Some(shader),
+			shader: Some(loaded_shader),
 			..
-		}) = &self.loaded_project
+		}) = &mut self.loaded_project
 		{
-			shader.send_f32("iTime", self.time_elapsed.as_secs_f32())?;
+			if let Err(err) = loaded_shader.update_hot_reload(ctx, delta_time) {
+				MessageDialog::new()
+					.set_level(MessageLevel::Error)
+					.set_description(format!("Error hot reloading shader: {}", err))
+					.show();
+			}
+			loaded_shader
+				.shader
+				.send_f32("iTime", self.time_elapsed.as_secs_f32())?;
 		}
 		Ok(())
 	}
@@ -175,7 +179,7 @@ impl State<anyhow::Error> for MainState {
 		self.canvas.render_to(ctx, |ctx| -> anyhow::Result<()> {
 			ctx.clear(OFFWHITE);
 			if let Some(LoadedProject { shader, track_info }) = &self.loaded_project {
-				if let Some(shader) = shader {
+				if let Some(LoadedShader { shader, .. }) = shader {
 					Mesh::rectangle(ctx, Rect::new(Vec2::ZERO, BASE_RESOLUTION.as_vec2()))
 						.draw(ctx, shader);
 				}
@@ -216,7 +220,7 @@ struct Fonts {
 }
 
 struct LoadedProject {
-	shader: Option<Shader>,
+	shader: Option<LoadedShader>,
 	track_info: TrackInfo,
 }
 
@@ -228,15 +232,50 @@ impl LoadedProject {
 			.shader_path
 			.map(|shader_path| {
 				let shader_full_path = project_path.parent().unwrap().join(shader_path);
-				Shader::from_fragment_file(ctx, shader_full_path)
+				LoadedShader::load(ctx, shader_full_path)
 			})
 			.transpose()?;
-		if let Some(shader) = &shader {
-			shader.send_vec2("iResolution", BASE_RESOLUTION.as_vec2())?;
-		}
 		Ok(Self {
 			shader,
 			track_info: TrackInfo::new(&project.track_info),
 		})
+	}
+}
+
+struct LoadedShader {
+	shader: Shader,
+	path: PathBuf,
+	last_modified_time: SystemTime,
+	time_since_last_hot_reload: Duration,
+}
+
+impl LoadedShader {
+	const HOT_RELOAD_INTERVAL: Duration = Duration::from_secs(1);
+
+	fn load(ctx: &Context, path: impl AsRef<Path>) -> anyhow::Result<Self> {
+		let path = path.as_ref();
+		let shader = Shader::from_fragment_file(ctx, path)?;
+		shader.send_vec2("iResolution", BASE_RESOLUTION.as_vec2())?;
+		let last_modified_time = std::fs::metadata(path)?.modified()?;
+		Ok(Self {
+			shader,
+			path: path.to_path_buf(),
+			last_modified_time,
+			time_since_last_hot_reload: Duration::ZERO,
+		})
+	}
+
+	fn update_hot_reload(&mut self, ctx: &Context, delta_time: Duration) -> anyhow::Result<()> {
+		self.time_since_last_hot_reload += delta_time;
+		while self.time_since_last_hot_reload >= Self::HOT_RELOAD_INTERVAL {
+			let last_modified_time = std::fs::metadata(&self.path)?.modified()?;
+			if last_modified_time > self.last_modified_time {
+				self.shader = Shader::from_fragment_file(ctx, &self.path)?;
+				self.shader
+					.send_vec2("iResolution", BASE_RESOLUTION.as_vec2())?;
+			}
+			self.time_since_last_hot_reload -= delta_time;
+		}
+		Ok(())
 	}
 }
