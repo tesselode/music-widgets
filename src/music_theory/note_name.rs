@@ -1,4 +1,4 @@
-use thiserror::Error;
+use anyhow::bail;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum NoteName {
@@ -12,9 +12,9 @@ pub enum NoteName {
 }
 
 impl TryFrom<&str> for NoteName {
-	type Error = InvalidNoteName;
+	type Error = anyhow::Error;
 
-	fn try_from(value: &str) -> Result<Self, Self::Error> {
+	fn try_from(value: &str) -> anyhow::Result<Self> {
 		match value.to_lowercase().as_str() {
 			"a" => Ok(Self::A),
 			"b" => Ok(Self::B),
@@ -23,11 +23,7 @@ impl TryFrom<&str> for NoteName {
 			"e" => Ok(Self::E),
 			"f" => Ok(Self::F),
 			"g" => Ok(Self::G),
-			_ => Err(InvalidNoteName(value.to_string())),
+			_ => bail!("{} is not a valid note name", value),
 		}
 	}
 }
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Error)]
-#[error("'{0}' is not a valid note name")]
-pub struct InvalidNoteName(pub String);

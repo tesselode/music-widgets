@@ -1,5 +1,5 @@
+use anyhow::anyhow;
 use regex::Regex;
-use thiserror::Error;
 
 use super::{Accidental, NoteName};
 
@@ -10,26 +10,18 @@ pub struct Note {
 }
 
 impl TryFrom<&str> for Note {
-	type Error = InvalidNote;
+	type Error = anyhow::Error;
 
-	fn try_from(value: &str) -> Result<Self, Self::Error> {
+	fn try_from(value: &str) -> anyhow::Result<Self> {
 		let regex = Regex::new("([abcdefgABCDEFG])([b#]?)").unwrap();
 		let captures = regex
 			.captures(value)
-			.ok_or_else(|| InvalidNote(value.to_string()))?;
-		let note_name = captures[1]
-			.try_into()
-			.map_err(|_| InvalidNote(value.to_string()))?;
-		let accidental = captures[2]
-			.try_into()
-			.map_err(|_| InvalidNote(value.to_string()))?;
+			.ok_or_else(|| anyhow!("{} is not a valid note", value))?;
+		let note_name = captures[1].try_into()?;
+		let accidental = captures[2].try_into()?;
 		Ok(Self {
 			note_name,
 			accidental,
 		})
 	}
 }
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Error)]
-#[error("'{0}' is not a valid note")]
-pub struct InvalidNote(pub String);

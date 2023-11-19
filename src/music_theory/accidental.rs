@@ -1,4 +1,4 @@
-use thiserror::Error;
+use anyhow::bail;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Accidental {
@@ -8,18 +8,14 @@ pub enum Accidental {
 }
 
 impl TryFrom<&str> for Accidental {
-	type Error = InvalidAccidental;
+	type Error = anyhow::Error;
 
-	fn try_from(value: &str) -> Result<Self, Self::Error> {
+	fn try_from(value: &str) -> anyhow::Result<Self> {
 		match value {
 			"" => Ok(Self::None),
 			"b" => Ok(Self::Flat),
 			"#" => Ok(Self::Sharp),
-			_ => Err(InvalidAccidental(value.to_string())),
+			_ => bail!("{} is not a valid accidental", value),
 		}
 	}
 }
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Error)]
-#[error("'{0}' is not a valid accidental")]
-pub struct InvalidAccidental(pub String);

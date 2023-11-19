@@ -1,6 +1,6 @@
+use anyhow::anyhow;
 use regex::Regex;
 use serde::Deserialize;
-use thiserror::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
 #[serde(try_from = "&str")]
@@ -16,21 +16,17 @@ impl ToString for TimeSignature {
 }
 
 impl TryFrom<&str> for TimeSignature {
-	type Error = InvalidTimeSignature;
+	type Error = anyhow::Error;
 
-	fn try_from(value: &str) -> Result<Self, Self::Error> {
+	fn try_from(value: &str) -> anyhow::Result<Self> {
 		let regex = Regex::new("(\\d)+/(\\d)+").unwrap();
 		let captures = regex.captures(value).unwrap();
 		let top = captures[1]
 			.parse()
-			.map_err(|_| InvalidTimeSignature(value.to_string()))?;
+			.map_err(|_| anyhow!("{} is not a valid time signature", value))?;
 		let bottom = captures[2]
 			.parse()
-			.map_err(|_| InvalidTimeSignature(value.to_string()))?;
+			.map_err(|_| anyhow!("{} is not a valid time signature", value))?;
 		Ok(Self { top, bottom })
 	}
 }
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Error)]
-#[error("'{0}' is not a valid time signature")]
-pub struct InvalidTimeSignature(pub String);

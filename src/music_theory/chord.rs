@@ -1,6 +1,5 @@
 use regex::Regex;
 use serde::Deserialize;
-use thiserror::Error;
 
 use super::Note;
 
@@ -12,19 +11,13 @@ pub struct Chord {
 }
 
 impl TryFrom<&str> for Chord {
-	type Error = InvalidChord;
+	type Error = anyhow::Error;
 
-	fn try_from(value: &str) -> Result<Self, Self::Error> {
+	fn try_from(value: &str) -> anyhow::Result<Self> {
 		let regex = Regex::new("([abcdefgABCDEFG][#b]?)(.*)").unwrap();
 		let captures = regex.captures(value).unwrap();
-		let note = captures[1]
-			.try_into()
-			.map_err(|_| InvalidChord(value.to_string()))?;
+		let note = captures[1].try_into()?;
 		let text = captures[2].to_string();
 		Ok(Self { note, text })
 	}
 }
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Error)]
-#[error("'{0}' is not a valid chord")]
-pub struct InvalidChord(pub String);

@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use serde::Deserialize;
-use thiserror::Error;
 
 use crate::{
 	music_state::MusicState,
@@ -18,19 +17,11 @@ pub struct UserTrackInfo {
 }
 
 impl UserTrackInfo {
-	pub fn from_file(path: impl AsRef<Path>) -> Result<Self, UserTrackInfoFromFileError> {
+	pub fn from_file(path: impl AsRef<Path>) -> anyhow::Result<Self> {
 		let track_info_string = std::fs::read_to_string(path)?;
 		let track_info = serde_json::from_str(&track_info_string)?;
 		Ok(track_info)
 	}
-}
-
-#[derive(Debug, Error)]
-pub enum UserTrackInfoFromFileError {
-	#[error("{0}")]
-	IoError(#[from] std::io::Error),
-	#[error("{0}")]
-	ParseError(#[from] serde_json::Error),
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
