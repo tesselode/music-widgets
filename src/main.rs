@@ -7,12 +7,14 @@ mod user_track_info;
 mod widgets;
 
 use std::{
+	io::Write,
 	path::{Path, PathBuf},
+	process::{Child, Command, Stdio},
 	time::{Duration, SystemTime},
 };
 
 use clap::Parser;
-use egui::{Slider, TopBottomPanel};
+use egui::{ProgressBar, Slider, TopBottomPanel};
 use format::{format_time, parse_time};
 use glam::{UVec2, Vec2};
 use kira::sound::static_sound::{StaticSoundData, StaticSoundSettings};
@@ -21,7 +23,7 @@ use micro::{
 		mesh::Mesh,
 		shader::Shader,
 		text::{Font, FontSettings},
-		Canvas, CanvasSettings, DrawParams,
+		Canvas, CanvasSettings, DrawParams, SwapInterval,
 	},
 	input::Scancode,
 	math::Rect,
@@ -34,6 +36,7 @@ use track_info::TrackInfo;
 use widgets::{draw_bpm_panel, draw_metronome_panel};
 
 const BASE_RESOLUTION: UVec2 = UVec2::new(3840, 2160);
+const EXPORT_FPS: f64 = 60.0;
 const OFFWHITE: LinSrgba = LinSrgba::new(0.8, 0.8, 0.8, 1.0);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Parser)]
@@ -55,12 +58,9 @@ fn main() {
 
 struct MainState {
 	loaded_project: Option<LoadedProject>,
-	playing: bool,
-	time_elapsed: Duration,
 	fonts: Fonts,
 	canvas: Canvas,
-	// canvas_read_buffer: Vec<u8>,
-	// ffmpeg_process: Child,
+	mode: Mode,
 }
 
 impl MainState {
@@ -71,8 +71,6 @@ impl MainState {
 				.project_path
 				.map(|project_path| LoadedProject::load(ctx, project_path))
 				.transpose()?,
-			playing: false,
-			time_elapsed: Duration::ZERO,
 			fonts: Fonts {
 				small: Font::from_file(
 					ctx,
@@ -92,75 +90,146 @@ impl MainState {
 				)?,
 			},
 			canvas: Canvas::new(ctx, BASE_RESOLUTION, CanvasSettings::default()),
-			// canvas_read_buffer: vec![0; (BASE_RESOLUTION.x * BASE_RESOLUTION.y * 4) as usize],
-			/* ffmpeg_process: Command::new("ffmpeg")
-			.stdin(Stdio::piped())
-			.arg("-y")
-			.arg("-f")
-			.arg("rawvideo")
-			.arg("-vcodec")
-			.arg("rawvideo")
-			.arg("-s")
-			.arg(&format!("{}x{}", BASE_RESOLUTION.x, BASE_RESOLUTION.y))
-			.arg("-pix_fmt")
-			.arg("rgba")
-			.arg("-r")
-			.arg("60")
-			.arg("-i")
-			.arg("-")
-			.arg("-i")
-			.arg("continuum.flac")
-			.arg("-b:a")
-			.arg("264k")
-			.arg("-c:v")
-			.arg("libx264")
-			.arg("-r")
-			.arg("60")
-			.arg("-shortest")
-			.arg("test.mp4")
-			.spawn()?, */
+			mode: Mode::Live {
+				playing: false,
+				time_elapsed: Duration::ZERO,
+			},
 		})
+	}
+
+	fn time_elapsed(&mut self) -> Duration {
+		match &self.mode {
+			Mode::Live { time_elapsed, .. } => *time_elapsed,
+			Mode::Rendering { current_frame, .. } => {
+				*current_frame * Duration::from_secs_f64(1.0 / EXPORT_FPS)
+			}
+		}
+	}
+
+	fn start_rendering(
+		&mut self,
+		ctx: &mut Context,
+		output_path: impl AsRef<Path>,
+	) -> anyhow::Result<()> {
+		let Some(LoadedProject { audio_path, .. }) = &self.loaded_project else {
+			panic!("no project is loaded");
+		};
+		ctx.set_swap_interval(SwapInterval::Immediate)?;
+		self.mode = Mode::Rendering {
+			current_frame: 0,
+			canvas_read_buffer: vec![0; (BASE_RESOLUTION.x * BASE_RESOLUTION.y * 4) as usize],
+			ffmpeg_process: Command::new("ffmpeg")
+				.stdin(Stdio::piped())
+				.arg("-y")
+				.arg("-f")
+				.arg("rawvideo")
+				.arg("-vcodec")
+				.arg("rawvideo")
+				.arg("-s")
+				.arg(&format!("{}x{}", BASE_RESOLUTION.x, BASE_RESOLUTION.y))
+				.arg("-pix_fmt")
+				.arg("rgba")
+				.arg("-r")
+				.arg(EXPORT_FPS.to_string())
+				.arg("-i")
+				.arg("-")
+				.arg("-i")
+				.arg(audio_path)
+				.arg("-b:a")
+				.arg("320k")
+				.arg("-c:v")
+				.arg("libx264")
+				.arg("-r")
+				.arg(EXPORT_FPS.to_string())
+				.arg("-shortest")
+				.arg(output_path.as_ref())
+				.spawn()?,
+		};
+		Ok(())
 	}
 }
 
 impl State<anyhow::Error> for MainState {
 	fn ui(&mut self, ctx: &mut Context, egui_ctx: &egui::Context) -> Result<(), anyhow::Error> {
 		TopBottomPanel::bottom("main_menu").show(egui_ctx, |ui| {
-			egui::menu::bar(ui, |ui| {
-				if ui.button("Load").clicked() {
-					if let Some(project_path) = FileDialog::new()
-						.set_directory(std::env::current_exe().unwrap())
-						.add_filter("Project file", &["json"])
-						.pick_file()
-					{
-						match LoadedProject::load(ctx, project_path) {
-							Ok(loaded_project) => {
-								self.loaded_project = Some(loaded_project);
-								self.playing = false;
-								self.time_elapsed = Duration::ZERO;
+			egui::menu::bar(ui, |ui| match &mut self.mode {
+				Mode::Live {
+					playing,
+					time_elapsed,
+				} => {
+					if ui.button("Load").clicked() {
+						if let Some(project_path) = FileDialog::new()
+							.set_directory(std::env::current_exe().unwrap())
+							.add_filter("Project file", &["json"])
+							.pick_file()
+						{
+							match LoadedProject::load(ctx, project_path) {
+								Ok(loaded_project) => {
+									self.loaded_project = Some(loaded_project);
+									*playing = false;
+									*time_elapsed = Duration::ZERO;
+								}
+								Err(err) => {
+									MessageDialog::new()
+										.set_level(MessageLevel::Error)
+										.set_description(format!("Error loading project: {}", err))
+										.show();
+								}
 							}
-							Err(err) => {
+						}
+					}
+					let render_button_clicked = ui.button("Render").clicked();
+					if let Some(LoadedProject { sound_data, .. }) = &self.loaded_project {
+						ui.checkbox(&mut *playing, "Playing");
+						let mut time_elapsed_f64 = time_elapsed.as_secs_f64();
+						let position_slider = Slider::new(
+							&mut time_elapsed_f64,
+							0.0..=sound_data.duration().as_secs_f64(),
+						)
+						.trailing_fill(true)
+						.custom_formatter(format_time)
+						.custom_parser(parse_time);
+						ui.style_mut().spacing.slider_width = 200.0;
+						if ui.add(position_slider).changed() {
+							*time_elapsed = Duration::from_secs_f64(time_elapsed_f64);
+						}
+					}
+					if render_button_clicked {
+						if let Some(output_path) = FileDialog::new()
+							.set_directory(std::env::current_exe().unwrap())
+							.add_filter("mp4 video", &["mp4"])
+							.save_file()
+						{
+							if let Err(err) = self.start_rendering(ctx, output_path) {
 								MessageDialog::new()
 									.set_level(MessageLevel::Error)
-									.set_description(format!("Error loading project: {}", err))
+									.set_description(format!("Error rendering project: {}", err))
 									.show();
 							}
 						}
 					}
 				}
-				if let Some(LoadedProject { sound_data, .. }) = &self.loaded_project {
-					ui.checkbox(&mut self.playing, "Playing");
-					let mut time_elapsed_f64 = self.time_elapsed.as_secs_f64();
-					let position_slider = Slider::new(
-						&mut time_elapsed_f64,
-						0.0..=sound_data.duration().as_secs_f64(),
-					)
-					.trailing_fill(true)
-					.custom_formatter(format_time)
-					.custom_parser(parse_time);
-					ui.style_mut().spacing.slider_width = 200.0;
-					if ui.add(position_slider).changed() {
-						self.time_elapsed = Duration::from_secs_f64(time_elapsed_f64);
+				Mode::Rendering {
+					current_frame,
+					ffmpeg_process,
+					..
+				} => {
+					let Some(LoadedProject { sound_data, .. }) = &self.loaded_project else {
+						panic!("no project loaded");
+					};
+					let total_frames = (sound_data.duration().as_secs_f64() * EXPORT_FPS) as u32;
+					ui.add(
+						ProgressBar::new(*current_frame as f32 / total_frames as f32)
+							.desired_width(500.0),
+					);
+					ui.label(format!("Rendering ({}/{})", *current_frame, total_frames));
+					if ui.button("Cancel").clicked() {
+						ffmpeg_process.kill().ok();
+						ctx.set_swap_interval(SwapInterval::VSync).unwrap();
+						self.mode = Mode::Live {
+							playing: false,
+							time_elapsed: Duration::ZERO,
+						};
 					}
 				}
 			});
@@ -180,28 +249,38 @@ impl State<anyhow::Error> for MainState {
 	}
 
 	fn update(&mut self, ctx: &mut Context, delta_time: Duration) -> Result<(), anyhow::Error> {
-		if self.playing {
-			self.time_elapsed += delta_time;
+		let time_elapsed = self.time_elapsed();
+		if let Mode::Live {
+			playing,
+			time_elapsed,
+		} = &mut self.mode
+		{
+			if *playing {
+				*time_elapsed += delta_time;
+			}
 		}
 		if let Some(LoadedProject {
 			shader: Some(loaded_shader),
 			..
 		}) = &mut self.loaded_project
 		{
-			if let Err(err) = loaded_shader.update_hot_reload(ctx, delta_time) {
-				MessageDialog::new()
-					.set_level(MessageLevel::Error)
-					.set_description(format!("Error hot reloading shader: {}", err))
-					.show();
+			if matches!(self.mode, Mode::Live { .. }) {
+				if let Err(err) = loaded_shader.update_hot_reload(ctx, delta_time) {
+					MessageDialog::new()
+						.set_level(MessageLevel::Error)
+						.set_description(format!("Error hot reloading shader: {}", err))
+						.show();
+				}
 			}
 			loaded_shader
 				.shader
-				.send_f32("iTime", self.time_elapsed.as_secs_f32())?;
+				.send_f32("iTime", time_elapsed.as_secs_f32())?;
 		}
 		Ok(())
 	}
 
 	fn draw(&mut self, ctx: &mut Context) -> Result<(), anyhow::Error> {
+		let time_elapsed = self.time_elapsed();
 		self.canvas.render_to(ctx, |ctx| -> anyhow::Result<()> {
 			ctx.clear(OFFWHITE);
 			if let Some(LoadedProject {
@@ -215,14 +294,14 @@ impl State<anyhow::Error> for MainState {
 				draw_bpm_panel(
 					ctx,
 					track_info,
-					self.time_elapsed,
+					time_elapsed,
 					&self.fonts,
 					Vec2::new(1.0, 1.0),
 				)?;
 				draw_metronome_panel(
 					ctx,
 					track_info,
-					self.time_elapsed,
+					time_elapsed,
 					&self.fonts,
 					Vec2::new(1.0, 7.0),
 				)?;
@@ -233,14 +312,44 @@ impl State<anyhow::Error> for MainState {
 			ctx,
 			DrawParams::new().scaled(ctx.window_size().as_vec2() / self.canvas.size().as_vec2()),
 		);
-		// self.canvas.read(&mut self.canvas_read_buffer);
-		/* self.ffmpeg_process
-		.stdin
-		.as_mut()
-		.unwrap()
-		.write_all(&self.canvas_read_buffer)?; */
+		if let Mode::Rendering {
+			current_frame,
+			canvas_read_buffer,
+			ffmpeg_process,
+			..
+		} = &mut self.mode
+		{
+			self.canvas.read(canvas_read_buffer);
+			if ffmpeg_process
+				.stdin
+				.as_mut()
+				.unwrap()
+				.write_all(canvas_read_buffer)
+				.is_err()
+			{
+				ctx.set_swap_interval(SwapInterval::VSync)?;
+				self.mode = Mode::Live {
+					playing: false,
+					time_elapsed: Duration::ZERO,
+				};
+			} else {
+				*current_frame += 1;
+			}
+		}
 		Ok(())
 	}
+}
+
+enum Mode {
+	Live {
+		playing: bool,
+		time_elapsed: Duration,
+	},
+	Rendering {
+		current_frame: u32,
+		canvas_read_buffer: Vec<u8>,
+		ffmpeg_process: Child,
+	},
 }
 
 struct Fonts {
@@ -250,6 +359,7 @@ struct Fonts {
 
 struct LoadedProject {
 	sound_data: StaticSoundData,
+	audio_path: PathBuf,
 	shader: Option<LoadedShader>,
 	track_info: TrackInfo,
 }
@@ -267,7 +377,8 @@ impl LoadedProject {
 			})
 			.transpose()?;
 		Ok(Self {
-			sound_data: StaticSoundData::from_file(audio_path, StaticSoundSettings::default())?,
+			sound_data: StaticSoundData::from_file(&audio_path, StaticSoundSettings::default())?,
+			audio_path,
 			shader,
 			track_info: TrackInfo::new(&project.track_info),
 		})
