@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.75"
+clap = { version = "4.4.8", features = ["derive"] }
 egui = "0.23.0"
 glam = "0.24.2"
 micro = { git = "https://github.com/tesselode/micro", rev = "3c9c0c7" }

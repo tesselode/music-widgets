@@ -5,8 +5,12 @@ mod track_info;
 mod user_track_info;
 mod widgets;
 
-use std::{path::Path, time::Duration};
+use std::{
+	path::{Path, PathBuf},
+	time::Duration,
+};
 
+use clap::Parser;
 use egui::TopBottomPanel;
 use glam::{UVec2, Vec2};
 use micro::{
@@ -28,6 +32,11 @@ use widgets::{draw_bpm_panel, draw_metronome_panel};
 
 const BASE_RESOLUTION: UVec2 = UVec2::new(3840, 2160);
 const OFFWHITE: LinSrgba = LinSrgba::new(0.8, 0.8, 0.8, 1.0);
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Parser)]
+struct Args {
+	project_path: Option<PathBuf>,
+}
 
 fn main() {
 	micro::run(
@@ -52,8 +61,12 @@ struct MainState {
 
 impl MainState {
 	pub fn new(ctx: &mut Context) -> anyhow::Result<Self> {
+		let args = Args::parse();
 		Ok(Self {
-			loaded_project: None,
+			loaded_project: args
+				.project_path
+				.map(|project_path| LoadedProject::load(ctx, project_path))
+				.transpose()?,
 			time_elapsed: Duration::ZERO,
 			fonts: Fonts {
 				small: Font::from_file(
