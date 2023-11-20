@@ -31,9 +31,8 @@ use micro::{
 };
 use palette::LinSrgba;
 use rendering_state::RenderingState;
-use rfd::{MessageDialog, MessageLevel};
 use track_info::TrackInfo;
-use ui::{IdleModeMenuAction, LiveModeMenuAction, RenderingModeMenuAction};
+use ui::{show_dialog_if_error, IdleModeMenuAction, LiveModeMenuAction, RenderingModeMenuAction};
 use widgets::{draw_bpm_panel, draw_metronome_panel};
 
 const BASE_RESOLUTION: UVec2 = UVec2::new(3840, 2160);
@@ -115,7 +114,7 @@ impl MainState {
 
 impl State<anyhow::Error> for MainState {
 	fn ui(&mut self, ctx: &mut Context, egui_ctx: &egui::Context) -> Result<(), anyhow::Error> {
-		TopBottomPanel::bottom("main_menu")
+		let result = TopBottomPanel::bottom("main_menu")
 			.show(egui_ctx, |ui| -> anyhow::Result<()> {
 				egui::menu::bar(ui, |ui| -> anyhow::Result<()> {
 					match &mut self.mode {
@@ -174,7 +173,8 @@ impl State<anyhow::Error> for MainState {
 				.inner?;
 				Ok(())
 			})
-			.inner?;
+			.inner;
+		show_dialog_if_error(result);
 		Ok(())
 	}
 
@@ -201,12 +201,7 @@ impl State<anyhow::Error> for MainState {
 					*time_elapsed += delta_time;
 				}
 				if let Some(shader) = shader {
-					if let Err(err) = shader.update_hot_reload(ctx, delta_time) {
-						MessageDialog::new()
-							.set_level(MessageLevel::Error)
-							.set_description(format!("Error hot reloading shader: {}", err))
-							.show();
-					}
+					show_dialog_if_error(shader.update_hot_reload(ctx, delta_time));
 					shader
 						.shader
 						.send_f32("iTime", time_elapsed.as_secs_f32())?;

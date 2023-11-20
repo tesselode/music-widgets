@@ -1,5 +1,6 @@
 use std::{path::Path, time::Duration};
 
+use anyhow::Context as AnyhowContext;
 use kira::{
 	manager::{AudioManager, AudioManagerSettings},
 	sound::static_sound::StaticSoundHandle,
@@ -24,7 +25,8 @@ impl LiveState {
 	pub fn from_loaded_project(loaded_project: LoadedProject) -> anyhow::Result<Self> {
 		Ok(Self {
 			loaded_project,
-			audio_manager: AudioManager::new(AudioManagerSettings::default())?,
+			audio_manager: AudioManager::new(AudioManagerSettings::default())
+				.context("error creating audio manager")?,
 			playing_sound: None,
 			time_elapsed: Duration::ZERO,
 		})
@@ -32,14 +34,18 @@ impl LiveState {
 
 	pub fn set_playing(&mut self, playing: bool) -> anyhow::Result<()> {
 		if playing {
-			self.playing_sound = Some(self.audio_manager.play(
-				self.loaded_project.sound_data.with_modified_settings(|s| {
-					s.playback_region(self.time_elapsed.as_secs_f64()..)
-				}),
-			)?);
+			self.playing_sound = Some(
+				self.audio_manager
+					.play(self.loaded_project.sound_data.with_modified_settings(|s| {
+						s.playback_region(self.time_elapsed.as_secs_f64()..)
+					}))
+					.context("error playing audio")?,
+			);
 		} else {
 			if let Some(playing_sound) = &mut self.playing_sound {
-				playing_sound.stop(Tween::default())?;
+				playing_sound
+					.stop(Tween::default())
+					.context("error stopping audio")?;
 			}
 			self.playing_sound = None;
 		}
@@ -50,8 +56,12 @@ impl LiveState {
 		self.time_elapsed = time;
 		if seek_audio {
 			if let Some(playing_sound) = &mut self.playing_sound {
-				playing_sound.set_playback_region(..)?;
-				playing_sound.seek_to(time.as_secs_f64())?;
+				playing_sound
+					.set_playback_region(..)
+					.context("error seeking audio")?;
+				playing_sound
+					.seek_to(time.as_secs_f64())
+					.context("error seeking audio")?;
 			}
 		}
 		Ok(())
@@ -62,6 +72,6 @@ impl LiveState {
 		ctx: &mut Context,
 		output_path: impl AsRef<Path>,
 	) -> anyhow::Result<RenderingState> {
-		RenderingState::new(ctx, self.loaded_project, output_path)
+		RenderingState::new(ctx, self.loaded_project, output_path).context("error rendering")
 	}
 }

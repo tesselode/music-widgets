@@ -1,7 +1,11 @@
-use std::{path::PathBuf, time::Duration};
+use std::{
+	fmt::{Debug, Display},
+	path::PathBuf,
+	time::Duration,
+};
 
 use egui::{ProgressBar, Slider, Ui};
-use rfd::FileDialog;
+use rfd::{FileDialog, MessageDialog, MessageLevel};
 
 use crate::{
 	format::{format_time, parse_time},
@@ -112,4 +116,14 @@ pub(super) enum LiveModeMenuAction {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(super) enum RenderingModeMenuAction {
 	CancelRendering,
+}
+
+pub fn show_dialog_if_error<T, E: Debug + Display>(result: Result<T, E>) {
+	if let Err(err) = result {
+		MessageDialog::new()
+			.set_title("Error")
+			.set_level(MessageLevel::Error)
+			.set_description(format!("{:?}", err))
+			.show();
+	}
 }
