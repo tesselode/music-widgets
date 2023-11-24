@@ -1,17 +1,20 @@
+use std::fmt::Display;
+
 use anyhow::anyhow;
 use regex::Regex;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(into = "String")]
 #[serde(try_from = "&str")]
 pub struct TimeSignature {
 	pub top: u32,
 	pub bottom: u32,
 }
 
-impl ToString for TimeSignature {
-	fn to_string(&self) -> String {
-		format!("{}/{}", self.top, self.bottom)
+impl Display for TimeSignature {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.write_fmt(format_args!("{}/{}", self.top, self.bottom))
 	}
 }
 
@@ -28,5 +31,11 @@ impl TryFrom<&str> for TimeSignature {
 			.parse()
 			.map_err(|_| anyhow!("{} is not a valid time signature", value))?;
 		Ok(Self { top, bottom })
+	}
+}
+
+impl From<TimeSignature> for String {
+	fn from(value: TimeSignature) -> Self {
+		format!("{}", value)
 	}
 }

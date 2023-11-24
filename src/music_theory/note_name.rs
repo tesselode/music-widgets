@@ -1,3 +1,5 @@
+use std::fmt::{Display, Write};
+
 use anyhow::bail;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -9,6 +11,20 @@ pub enum NoteName {
 	E,
 	F,
 	G,
+}
+
+impl Display for NoteName {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.write_char(match self {
+			NoteName::A => 'A',
+			NoteName::B => 'B',
+			NoteName::C => 'C',
+			NoteName::D => 'D',
+			NoteName::E => 'E',
+			NoteName::F => 'F',
+			NoteName::G => 'G',
+		})
+	}
 }
 
 impl TryFrom<&str> for NoteName {

@@ -1,11 +1,11 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
 	music_state::MusicState,
 	music_theory::{Chord, TimeSignature},
 };
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UserTrackInfo {
 	#[serde(flatten)]
 	pub initial_state: MusicState,
@@ -14,7 +14,7 @@ pub struct UserTrackInfo {
 	pub changes: Vec<Change>,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Change {
 	pub after: u32,
 	pub bpm: Option<f64>,

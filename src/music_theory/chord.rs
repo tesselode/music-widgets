@@ -1,13 +1,28 @@
+use std::fmt::Display;
+
 use regex::Regex;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::Note;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(into = "String")]
 #[serde(try_from = "&str")]
 pub struct Chord {
 	pub note: Note,
 	pub text: String,
+}
+
+impl Display for Chord {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.write_fmt(format_args!("{}{}", self.note, self.text))
+	}
+}
+
+impl From<Chord> for String {
+	fn from(value: Chord) -> Self {
+		format!("{}", value)
+	}
 }
 
 impl TryFrom<&str> for Chord {

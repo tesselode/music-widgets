@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use anyhow::anyhow;
 use regex::Regex;
 
@@ -7,6 +9,12 @@ use super::{Accidental, NoteName};
 pub struct Note {
 	pub note_name: NoteName,
 	pub accidental: Accidental,
+}
+
+impl Display for Note {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.write_fmt(format_args!("{}{}", self.note_name, self.accidental))
+	}
 }
 
 impl TryFrom<&str> for Note {

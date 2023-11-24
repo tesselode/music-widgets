@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
 	music_theory::{Chord, TimeSignature},
@@ -6,7 +6,7 @@ use crate::{
 };
 
 /// Basic info about music at an instant in time.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MusicState {
 	pub bpm: f64,
 	pub time_signature: TimeSignature,
