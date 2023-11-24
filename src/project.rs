@@ -2,12 +2,14 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::user_track_info::UserTrackInfo;
+use crate::{shader_param::ShaderParam, user_track_info::UserTrackInfo};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Project {
 	pub audio_file_path: PathBuf,
 	pub shader_path: Option<PathBuf>,
+	#[serde(default)]
+	pub shader_params: Vec<ShaderParam>,
 	pub track_info: UserTrackInfo,
 }
 

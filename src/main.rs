@@ -6,6 +6,7 @@ mod music_state;
 mod music_theory;
 mod project;
 mod rendering_state;
+mod shader_param;
 mod track_info;
 mod ui;
 mod user_track_info;

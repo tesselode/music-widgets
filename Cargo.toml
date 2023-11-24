@@ -12,7 +12,7 @@ egui = "0.24.0"
 glam = "0.24.2"
 kira = "0.8.5"
 micro = { git = "https://github.com/tesselode/micro", rev = "c4353d7" }
-palette = "0.7.3"
+palette = { version = "0.7.3", features = ["serializing"] }
 regex = "1.10.2"
 rfd = "0.12.1"
 serde = { version = "1.0.192", features = ["derive"] }
