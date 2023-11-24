@@ -8,10 +8,10 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.75"
 clap = { version = "4.4.8", features = ["derive"] }
-egui = "0.23.0"
+egui = "0.24.0"
 glam = "0.24.2"
 kira = "0.8.5"
-micro = { git = "https://github.com/tesselode/micro", rev = "3c9c0c7" }
+micro = { git = "https://github.com/tesselode/micro", rev = "c4353d7" }
 palette = "0.7.3"
 regex = "1.10.2"
 rfd = "0.12.1"
