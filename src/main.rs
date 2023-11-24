@@ -76,15 +76,15 @@ impl MainState {
 			fonts: Fonts {
 				small: Font::from_file(
 					ctx,
-					"resources/traceroute.ttf",
+					"resources/IBMPlexMono-Italic.ttf",
 					FontSettings {
-						scale: 64.0,
+						scale: 48.0,
 						..Default::default()
 					},
 				)?,
 				large: Font::from_file(
 					ctx,
-					"resources/traceroute.ttf",
+					"resources/IBMPlexMono-Bold.ttf",
 					FontSettings {
 						scale: 128.0,
 						..Default::default()
