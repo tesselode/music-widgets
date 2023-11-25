@@ -1,5 +1,5 @@
 use anyhow::bail;
-use palette::{rgb::channels::Rgba, LinSrgba, Srgb, Srgba, WithAlpha};
+use palette::{rgb::channels::Rgba, LinSrgba, Srgba};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

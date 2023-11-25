@@ -19,4 +19,10 @@ impl Project {
 		let project = serde_json::from_str(&project_string)?;
 		Ok(project)
 	}
+
+	pub fn save(&self, path: impl AsRef<Path>) -> anyhow::Result<()> {
+		let project_string = serde_json::to_string_pretty(&self)?;
+		std::fs::write(path, project_string)?;
+		Ok(())
+	}
 }

@@ -15,7 +15,6 @@ mod widgets;
 use std::{io::Write, path::PathBuf, time::Duration};
 
 use clap::Parser;
-use egui::TopBottomPanel;
 use glam::{UVec2, Vec2};
 use live_state::LiveState;
 use loaded_project::LoadedProject;
@@ -32,8 +31,9 @@ use micro::{
 };
 use palette::LinSrgba;
 use rendering_state::RenderingState;
+use shader_param::ShaderParamKind;
 use track_info::TrackInfo;
-use ui::{show_dialog_if_error, IdleModeMenuAction, LiveModeMenuAction, RenderingModeMenuAction};
+use ui::show_dialog_if_error;
 use widgets::{draw_bpm_panel, draw_metronome_panel};
 
 const BASE_RESOLUTION: UVec2 = UVec2::new(3840, 2160);
@@ -61,6 +61,7 @@ struct MainState {
 	mode: Mode,
 	fonts: Fonts,
 	canvas: Canvas,
+	show_shader_params_editor: bool,
 }
 
 impl MainState {
@@ -93,6 +94,7 @@ impl MainState {
 				)?,
 			},
 			canvas: Canvas::new(ctx, BASE_RESOLUTION, CanvasSettings::default()),
+			show_shader_params_editor: false,
 		})
 	}
 
@@ -115,67 +117,10 @@ impl MainState {
 
 impl State<anyhow::Error> for MainState {
 	fn ui(&mut self, ctx: &mut Context, egui_ctx: &egui::Context) -> Result<(), anyhow::Error> {
-		let result = TopBottomPanel::bottom("main_menu")
-			.show(egui_ctx, |ui| -> anyhow::Result<()> {
-				egui::menu::bar(ui, |ui| -> anyhow::Result<()> {
-					match &mut self.mode {
-						Mode::Idle => {
-							if let Some(action) = Self::render_idle_mode_menu(ui) {
-								match action {
-									IdleModeMenuAction::LoadProject { path } => {
-										self.mode = Mode::Live(LiveState::new(ctx, path)?);
-									}
-								}
-							}
-						}
-						Mode::Live(live_state) => {
-							if let Some(action) = Self::render_live_mode_menu(ui, live_state) {
-								match action {
-									LiveModeMenuAction::LoadProject { path } => {
-										self.mode = Mode::Live(LiveState::new(ctx, path)?);
-									}
-									LiveModeMenuAction::StartRendering { output_path } => {
-										let Mode::Live(live_state) = std::mem::take(&mut self.mode)
-										else {
-											unreachable!();
-										};
-										self.mode = Mode::Rendering(
-											live_state.start_rendering(ctx, output_path)?,
-										);
-									}
-									LiveModeMenuAction::SetPlaying(playing) => {
-										live_state.set_playing(playing)?;
-									}
-									LiveModeMenuAction::Seek { time, seek_audio } => {
-										live_state.seek(time, seek_audio)?;
-									}
-								}
-							}
-						}
-						Mode::Rendering(rendering_state) => {
-							if let Some(action) =
-								Self::render_rendering_mode_menu(ui, rendering_state)
-							{
-								match action {
-									RenderingModeMenuAction::CancelRendering => {
-										let Mode::Rendering(rendering_state) =
-											std::mem::take(&mut self.mode)
-										else {
-											unreachable!();
-										};
-										self.mode = Mode::Live(rendering_state.cancel()?);
-									}
-								}
-							}
-						}
-					}
-					Ok(())
-				})
-				.inner?;
-				Ok(())
-			})
-			.inner;
-		show_dialog_if_error(result);
+		self.render_main_menu(egui_ctx, ctx);
+		if self.show_shader_params_editor {
+			self.render_shader_params_editor(egui_ctx);
+		}
 		Ok(())
 	}
 
@@ -193,7 +138,11 @@ impl State<anyhow::Error> for MainState {
 	fn update(&mut self, ctx: &mut Context, delta_time: Duration) -> Result<(), anyhow::Error> {
 		match &mut self.mode {
 			Mode::Live(LiveState {
-				loaded_project: LoadedProject { shader, .. },
+				loaded_project: LoadedProject {
+					shader,
+					shader_params,
+					..
+				},
 				playing_sound,
 				time_elapsed,
 				..
@@ -206,6 +155,16 @@ impl State<anyhow::Error> for MainState {
 					shader
 						.shader
 						.send_f32("iTime", time_elapsed.as_secs_f32())?;
+					for param in shader_params {
+						match &param.kind {
+							ShaderParamKind::Float { value, .. } => {
+								shader.shader.send_f32(&param.name, *value)?;
+							}
+							ShaderParamKind::Color { value } => {
+								shader.shader.send_color(&param.name, value.0)?;
+							}
+						}
+					}
 				}
 			}
 			Mode::Rendering(RenderingState {
