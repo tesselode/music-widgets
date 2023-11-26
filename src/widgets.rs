@@ -247,23 +247,75 @@ fn text_translation(text: &Text, target_position: Vec2, anchor: Vec2) -> Vec2 {
 }
 
 fn chord_text(ctx: &mut Context, chord: &str, fonts: &Fonts) -> Text {
+	let fonts = &[
+		&fonts.large,
+		&fonts.medium,
+		&fonts.music_large,
+		&fonts.music_medium,
+	];
+	let mut chord_string_fragments = split_chord_str(chord);
+	for (_, s) in &mut chord_string_fragments {
+		*s = s.replace('b', "♭").replace('#', "♯");
+	}
+	let fragments = chord_string_fragments
+		.iter()
+		.map(|(font, text)| TextFragment {
+			font_index: match font {
+				ChordTextFont::Big => 0,
+				ChordTextFont::Small => 1,
+				ChordTextFont::MusicBig => 2,
+				ChordTextFont::MusicSmall => 3,
+			},
+			text,
+		})
+		.collect::<Vec<_>>();
+	Text::with_multiple_fonts(ctx, fonts, fragments.iter(), LayoutSettings::default())
+}
+
+fn split_chord_str(chord: &str) -> Vec<(ChordTextFont, String)> {
 	let regex = Regex::new("([ABCDEFG][b#]?)(.*)").unwrap();
 	let captures = regex.captures(chord).expect("invalid chord");
 	let big_text = &captures[1];
 	let small_text = &captures[2];
-	Text::with_multiple_fonts(
-		ctx,
-		&[&fonts.large, &fonts.medium],
-		&[
-			TextFragment {
-				font_index: 0,
-				text: big_text,
-			},
-			TextFragment {
-				font_index: 1,
-				text: small_text,
-			},
-		],
-		LayoutSettings::default(),
-	)
+	let mut fragments = vec![];
+	for (is_accidental, string_fragment) in split_chord_str_by_accidentals(big_text) {
+		let font = if is_accidental {
+			ChordTextFont::MusicBig
+		} else {
+			ChordTextFont::Big
+		};
+		fragments.push((font, string_fragment));
+	}
+	for (is_accidental, string_fragment) in split_chord_str_by_accidentals(small_text) {
+		let font = if is_accidental {
+			ChordTextFont::MusicSmall
+		} else {
+			ChordTextFont::Small
+		};
+		fragments.push((font, string_fragment));
+	}
+	fragments
+}
+
+fn split_chord_str_by_accidentals(s: &str) -> Vec<(bool, String)> {
+	let accidental_indices =
+		(0..s.len()).filter(|i| &s[*i..*i + 1] == "b" || &s[*i..*i + 1] == "#");
+	let mut next_substr_start = 0;
+	let mut fragments = vec![];
+	for accidental_index in accidental_indices {
+		fragments.push((false, s[next_substr_start..accidental_index].to_string()));
+		fragments.push((true, s[accidental_index..accidental_index + 1].to_string()));
+		next_substr_start = accidental_index + 1;
+	}
+	if next_substr_start < s.len() {
+		fragments.push((false, s[next_substr_start..].to_string()));
+	}
+	fragments
+}
+
+enum ChordTextFont {
+	Big,
+	Small,
+	MusicBig,
+	MusicSmall,
 }

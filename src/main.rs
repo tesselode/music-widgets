@@ -113,7 +113,7 @@ impl MainState {
 					ctx,
 					"resources/NotoMusic-Regular.ttf",
 					FontSettings {
-						scale: 64.0,
+						scale: 96.0,
 						chars: "♭♯".to_string(),
 						..Default::default()
 					},
