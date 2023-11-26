@@ -39,6 +39,8 @@ use widgets::{draw_bpm_panel, draw_chord_panel, draw_key_panel, draw_metronome_p
 const BASE_RESOLUTION: UVec2 = UVec2::new(3840, 2160);
 const EXPORT_FPS: f64 = 60.0;
 const OFFWHITE: LinSrgba = LinSrgba::new(0.8, 0.8, 0.8, 1.0);
+const FLAT_SYMBOL: &str = "♭";
+const SHARP_SYMBOL: &str = "♯";
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Parser)]
 struct Args {
@@ -78,7 +80,7 @@ impl MainState {
 			fonts: Fonts {
 				small: Font::from_file(
 					ctx,
-					"resources/IBMPlexMono-Italic.ttf",
+					"resources/MonoMusic-Regular.ttf",
 					FontSettings {
 						scale: 48.0,
 						..Default::default()
@@ -86,7 +88,7 @@ impl MainState {
 				)?,
 				medium: Font::from_file(
 					ctx,
-					"resources/IBMPlexMono-Bold.ttf",
+					"resources/MonoMusic-Regular.ttf",
 					FontSettings {
 						scale: 64.0,
 						..Default::default()
@@ -94,7 +96,7 @@ impl MainState {
 				)?,
 				large: Font::from_file(
 					ctx,
-					"resources/IBMPlexMono-Bold.ttf",
+					"resources/MonoMusic-Regular.ttf",
 					FontSettings {
 						scale: 128.0,
 						..Default::default()
@@ -102,19 +104,19 @@ impl MainState {
 				)?,
 				music_large: Font::from_file(
 					ctx,
-					"resources/NotoMusic-Regular.ttf",
+					"resources/MonoMusic-Regular.ttf",
 					FontSettings {
 						scale: 128.0,
-						chars: "♭♯".to_string(),
+						chars: FLAT_SYMBOL.to_string() + SHARP_SYMBOL,
 						..Default::default()
 					},
 				)?,
 				music_medium: Font::from_file(
 					ctx,
-					"resources/NotoMusic-Regular.ttf",
+					"resources/MonoMusic-Regular.ttf",
 					FontSettings {
-						scale: 96.0,
-						chars: "♭♯".to_string(),
+						scale: 64.0,
+						chars: FLAT_SYMBOL.to_string() + SHARP_SYMBOL,
 						..Default::default()
 					},
 				)?,

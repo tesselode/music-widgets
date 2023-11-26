@@ -15,7 +15,7 @@ use micro::{
 use palette::LinSrgba;
 use regex::Regex;
 
-use crate::{track_info::TrackInfo, Fonts, OFFWHITE};
+use crate::{track_info::TrackInfo, Fonts, FLAT_SYMBOL, OFFWHITE, SHARP_SYMBOL};
 
 use self::beat_indicator::draw_beat_indicator;
 
@@ -255,7 +255,7 @@ fn chord_text(ctx: &mut Context, chord: &str, fonts: &Fonts) -> Text {
 	];
 	let mut chord_string_fragments = split_chord_str(chord);
 	for (_, s) in &mut chord_string_fragments {
-		*s = s.replace('b', "♭").replace('#', "♯");
+		*s = s.replace('b', FLAT_SYMBOL).replace('#', SHARP_SYMBOL);
 	}
 	let fragments = chord_string_fragments
 		.iter()
