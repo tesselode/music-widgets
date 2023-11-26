@@ -6,13 +6,14 @@ use glam::Vec2;
 use micro::{
 	graphics::{
 		mesh::{Mesh, ShapeStyle},
-		text::{LayoutSettings, Text},
+		text::{LayoutSettings, Text, TextFragment},
 		ColorConstants, DrawParams, StencilAction, StencilTest,
 	},
 	math::{Rect, VecConstants},
 	Context,
 };
 use palette::LinSrgba;
+use regex::Regex;
 
 use crate::{track_info::TrackInfo, Fonts, OFFWHITE};
 
@@ -171,8 +172,98 @@ pub(super) fn draw_metronome_panel(
 	Ok(())
 }
 
+pub(super) fn draw_key_panel(
+	ctx: &mut Context,
+	track_info: &TrackInfo,
+	timestamp: Duration,
+	fonts: &Fonts,
+	position: Vec2,
+) -> Result<(), anyhow::Error> {
+	draw_panel(
+		ctx,
+		fonts,
+		"key",
+		Rect::new(position, Vec2::new(12.0, 4.0)),
+		|ctx, grid_bounds| {
+			let text = chord_text(
+				ctx,
+				&track_info.music_state(timestamp).music_state.key,
+				fonts,
+			);
+			text.draw(
+				ctx,
+				DrawParams::new()
+					.translated(text_translation(
+						&text,
+						grid_bounds.center() * GRID_CELL_SIZE,
+						Vec2::splat(0.5),
+					))
+					.color(LinSrgba::BLACK),
+			);
+			Ok(())
+		},
+	)?;
+	Ok(())
+}
+
+pub(super) fn draw_chord_panel(
+	ctx: &mut Context,
+	track_info: &TrackInfo,
+	timestamp: Duration,
+	fonts: &Fonts,
+	position: Vec2,
+) -> Result<(), anyhow::Error> {
+	draw_panel(
+		ctx,
+		fonts,
+		"chord",
+		Rect::new(position, Vec2::new(12.0, 4.0)),
+		|ctx, grid_bounds| {
+			let text = chord_text(
+				ctx,
+				&track_info.music_state(timestamp).music_state.chord,
+				fonts,
+			);
+			text.draw(
+				ctx,
+				DrawParams::new()
+					.translated(text_translation(
+						&text,
+						grid_bounds.center() * GRID_CELL_SIZE,
+						Vec2::splat(0.5),
+					))
+					.color(LinSrgba::BLACK),
+			);
+			Ok(())
+		},
+	)?;
+	Ok(())
+}
+
 fn text_translation(text: &Text, target_position: Vec2, anchor: Vec2) -> Vec2 {
 	let previous_rect = text.bounds().unwrap();
 	let target_rect = previous_rect.positioned(target_position, anchor);
 	target_rect.top_left - previous_rect.top_left
+}
+
+fn chord_text(ctx: &mut Context, chord: &str, fonts: &Fonts) -> Text {
+	let regex = Regex::new("([ABCDEFG][b#]?)(.*)").unwrap();
+	let captures = regex.captures(chord).expect("invalid chord");
+	let big_text = &captures[1];
+	let small_text = &captures[2];
+	Text::with_multiple_fonts(
+		ctx,
+		&[&fonts.large, &fonts.medium],
+		&[
+			TextFragment {
+				font_index: 0,
+				text: big_text,
+			},
+			TextFragment {
+				font_index: 1,
+				text: small_text,
+			},
+		],
+		LayoutSettings::default(),
+	)
 }

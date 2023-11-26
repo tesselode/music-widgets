@@ -34,7 +34,7 @@ use rendering_state::RenderingState;
 use shader_param::ShaderParamKind;
 use track_info::TrackInfo;
 use ui::show_dialog_if_error;
-use widgets::{draw_bpm_panel, draw_metronome_panel};
+use widgets::{draw_bpm_panel, draw_chord_panel, draw_key_panel, draw_metronome_panel};
 
 const BASE_RESOLUTION: UVec2 = UVec2::new(3840, 2160);
 const EXPORT_FPS: f64 = 60.0;
@@ -84,11 +84,37 @@ impl MainState {
 						..Default::default()
 					},
 				)?,
+				medium: Font::from_file(
+					ctx,
+					"resources/IBMPlexMono-Bold.ttf",
+					FontSettings {
+						scale: 64.0,
+						..Default::default()
+					},
+				)?,
 				large: Font::from_file(
 					ctx,
 					"resources/IBMPlexMono-Bold.ttf",
 					FontSettings {
 						scale: 128.0,
+						..Default::default()
+					},
+				)?,
+				music_large: Font::from_file(
+					ctx,
+					"resources/NotoMusic-Regular.ttf",
+					FontSettings {
+						scale: 128.0,
+						chars: "♭♯".to_string(),
+						..Default::default()
+					},
+				)?,
+				music_medium: Font::from_file(
+					ctx,
+					"resources/NotoMusic-Regular.ttf",
+					FontSettings {
+						scale: 64.0,
+						chars: "♭♯".to_string(),
 						..Default::default()
 					},
 				)?,
@@ -111,6 +137,8 @@ impl MainState {
 		}
 		draw_bpm_panel(ctx, track_info, time_elapsed, fonts, Vec2::new(1.0, 1.0))?;
 		draw_metronome_panel(ctx, track_info, time_elapsed, fonts, Vec2::new(1.0, 7.0))?;
+		draw_key_panel(ctx, track_info, time_elapsed, fonts, Vec2::new(1.0, 14.0))?;
+		draw_chord_panel(ctx, track_info, time_elapsed, fonts, Vec2::new(1.0, 20.0))?;
 		Ok(())
 	}
 }
@@ -251,5 +279,8 @@ enum Mode {
 
 struct Fonts {
 	small: Font,
+	medium: Font,
 	large: Font,
+	music_large: Font,
+	music_medium: Font,
 }

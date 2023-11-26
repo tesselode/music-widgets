@@ -1,9 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{
-	music_state::MusicState,
-	music_theory::{Chord, TimeSignature},
-};
+use crate::{music_state::MusicState, music_theory::TimeSignature};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UserTrackInfo {
@@ -19,6 +16,6 @@ pub struct Change {
 	pub after: u32,
 	pub bpm: Option<f64>,
 	pub time_signature: Option<TimeSignature>,
-	pub key: Option<Chord>,
-	pub chord: Option<Chord>,
+	pub key: Option<String>,
+	pub chord: Option<String>,
 }

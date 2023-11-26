@@ -1,17 +1,14 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{
-	music_theory::{Chord, TimeSignature},
-	user_track_info::Change,
-};
+use crate::{music_theory::TimeSignature, user_track_info::Change};
 
 /// Basic info about music at an instant in time.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MusicState {
 	pub bpm: f64,
 	pub time_signature: TimeSignature,
-	pub key: Chord,
-	pub chord: Chord,
+	pub key: String,
+	pub chord: String,
 }
 
 impl MusicState {
