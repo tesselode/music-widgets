@@ -224,14 +224,9 @@ impl State<anyhow::Error> for MainState {
 		);
 		if let Mode::Rendering(rendering_state) = &mut self.mode {
 			self.canvas.read(&mut rendering_state.canvas_read_buffer);
-			if rendering_state
-				.ffmpeg_process
-				.stdin
-				.as_mut()
-				.unwrap()
-				.write_all(&rendering_state.canvas_read_buffer)
-				.is_err()
-			{
+			let ffmpeg_stdin = rendering_state.ffmpeg_process.stdin.as_mut().unwrap();
+			let write_result = ffmpeg_stdin.write_all(&rendering_state.canvas_read_buffer);
+			if write_result.is_err() {
 				let Mode::Rendering(rendering_state) = std::mem::take(&mut self.mode) else {
 					unreachable!();
 				};
