@@ -80,7 +80,7 @@ impl MainState {
 			fonts: Fonts {
 				small: Font::from_file(
 					ctx,
-					"resources/MonoMusic-Regular.ttf",
+					"resources/iosevka-italic.ttf",
 					FontSettings {
 						scale: 48.0,
 						..Default::default()
@@ -88,7 +88,7 @@ impl MainState {
 				)?,
 				medium: Font::from_file(
 					ctx,
-					"resources/MonoMusic-Regular.ttf",
+					"resources/iosevka-semibold.ttf",
 					FontSettings {
 						scale: 64.0,
 						..Default::default()
@@ -96,7 +96,7 @@ impl MainState {
 				)?,
 				large: Font::from_file(
 					ctx,
-					"resources/MonoMusic-Regular.ttf",
+					"resources/iosevka-semibold.ttf",
 					FontSettings {
 						scale: 128.0,
 						..Default::default()
@@ -104,7 +104,7 @@ impl MainState {
 				)?,
 				music_large: Font::from_file(
 					ctx,
-					"resources/MonoMusic-Regular.ttf",
+					"resources/iosevka-semibold.ttf",
 					FontSettings {
 						scale: 128.0,
 						chars: FLAT_SYMBOL.to_string() + SHARP_SYMBOL,
@@ -113,7 +113,7 @@ impl MainState {
 				)?,
 				music_medium: Font::from_file(
 					ctx,
-					"resources/MonoMusic-Regular.ttf",
+					"resources/iosevka-semibold.ttf",
 					FontSettings {
 						scale: 64.0,
 						chars: FLAT_SYMBOL.to_string() + SHARP_SYMBOL,
