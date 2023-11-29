@@ -15,7 +15,23 @@ pub struct UserTrackInfo {
 pub struct Change {
 	pub after: u32,
 	pub bpm: Option<f64>,
-	pub time_signature: Option<TimeSignature>,
-	pub key: Option<String>,
-	pub chord: Option<String>,
+	pub bpm_hidden: Option<bool>,
+	#[serde(
+		default,
+		skip_serializing_if = "Option::is_none",
+		with = "::serde_with::rust::double_option"
+	)]
+	pub time_signature: Option<Option<TimeSignature>>,
+	#[serde(
+		default,
+		skip_serializing_if = "Option::is_none",
+		with = "::serde_with::rust::double_option"
+	)]
+	pub key: Option<Option<String>>,
+	#[serde(
+		default,
+		skip_serializing_if = "Option::is_none",
+		with = "::serde_with::rust::double_option"
+	)]
+	pub chord: Option<Option<String>>,
 }

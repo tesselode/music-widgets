@@ -1,7 +1,7 @@
 use glam::Vec2;
 use micro::{
 	graphics::{
-		mesh::{MeshBuilder, ShapeStyle},
+		mesh::{Mesh, MeshBuilder, ShapeStyle},
 		ColorConstants, DrawParams,
 	},
 	math::Rect,
@@ -41,6 +41,17 @@ pub fn draw_beat_indicator(
 		LinSrgba::BLACK,
 	)?;
 	mesh_builder.build(ctx).draw(ctx, DrawParams::new());
+	Ok(())
+}
+
+pub fn draw_beat_indicator_placeholder(ctx: &mut Context, rect: Rect) -> anyhow::Result<()> {
+	Mesh::styled_rectangle(
+		ctx,
+		ShapeStyle::Stroke(STROKE_WIDTH),
+		Rect::new(rect.top_left * GRID_CELL_SIZE, rect.size * GRID_CELL_SIZE),
+		LinSrgba::BLACK,
+	)?
+	.draw(ctx, DrawParams::new());
 	Ok(())
 }
 

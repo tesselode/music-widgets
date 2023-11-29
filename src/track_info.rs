@@ -36,11 +36,14 @@ impl TrackInfo {
 			.unwrap()
 	}
 
-	pub fn current_beat(&self, timestamp: Duration) -> f64 {
+	pub fn current_beat(&self, timestamp: Duration) -> Option<f64> {
 		let state = self.music_state(timestamp);
-		let beats_per_second = state.music_state.bpm / 60.0;
-		let total_beats_elapsed = (timestamp - state.timestamp).as_secs_f64() * beats_per_second;
-		total_beats_elapsed % state.music_state.time_signature.top as f64
+		state.music_state.time_signature.map(|time_signature| {
+			let beats_per_second = state.music_state.bpm / 60.0;
+			let total_beats_elapsed =
+				(timestamp - state.timestamp).as_secs_f64() * beats_per_second;
+			total_beats_elapsed % time_signature.top as f64
+		})
 	}
 }
 

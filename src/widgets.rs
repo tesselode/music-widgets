@@ -17,11 +17,12 @@ use regex::Regex;
 
 use crate::{track_info::TrackInfo, Fonts, FLAT_SYMBOL, OFFWHITE, SHARP_SYMBOL};
 
-use self::beat_indicator::draw_beat_indicator;
+use self::beat_indicator::{draw_beat_indicator, draw_beat_indicator_placeholder};
 
 const GRID_CELL_SIZE: f32 = 48.0;
 const STROKE_WIDTH: f32 = 8.0;
 const PANEL_LABEL_PADDING: f32 = 16.0;
+const PLACEHOLDER_STRING: &str = "---";
 
 pub(super) fn draw_panel(
 	ctx: &mut Context,
@@ -100,16 +101,13 @@ pub(super) fn draw_bpm_panel(
 		"bpm",
 		Rect::new(position, Vec2::new(12.0, 4.0)),
 		|ctx, grid_bounds| {
-			let text = Text::new(
-				ctx,
-				&fonts.large,
-				&track_info
-					.music_state(timestamp)
-					.music_state
-					.bpm
-					.to_string(),
-				LayoutSettings::default(),
-			);
+			let music_state = &track_info.music_state(timestamp).music_state;
+			let bpm_string = if music_state.bpm_hidden {
+				PLACEHOLDER_STRING.to_string()
+			} else {
+				music_state.bpm.to_string()
+			};
+			let text = Text::new(ctx, &fonts.large, &bpm_string, LayoutSettings::default());
 			text.draw(
 				ctx,
 				DrawParams::new()
@@ -147,7 +145,8 @@ pub(super) fn draw_metronome_panel(
 					.music_state(timestamp)
 					.music_state
 					.time_signature
-					.to_string(),
+					.map(|time_signature| time_signature.to_string())
+					.unwrap_or_else(|| "---".to_string()),
 				LayoutSettings::default(),
 			);
 			text.draw(
@@ -160,12 +159,19 @@ pub(super) fn draw_metronome_panel(
 					))
 					.color(LinSrgba::BLACK),
 			);
-			draw_beat_indicator(
-				ctx,
-				grid_bounds.resized_y(1.0, 1.0),
+			if let (Some(time_signature), Some(current_beat)) = (
 				track_info.music_state(timestamp).music_state.time_signature,
-				track_info.current_beat(timestamp) as u32,
-			)?;
+				track_info.current_beat(timestamp),
+			) {
+				draw_beat_indicator(
+					ctx,
+					grid_bounds.resized_y(1.0, 1.0),
+					time_signature,
+					current_beat as u32,
+				)?;
+			} else {
+				draw_beat_indicator_placeholder(ctx, grid_bounds.resized_y(1.0, 1.0))?;
+			}
 			Ok(())
 		},
 	)?;
@@ -187,7 +193,12 @@ pub(super) fn draw_key_panel(
 		|ctx, grid_bounds| {
 			let text = chord_text(
 				ctx,
-				&track_info.music_state(timestamp).music_state.key,
+				track_info
+					.music_state(timestamp)
+					.music_state
+					.key
+					.as_deref()
+					.unwrap_or("---"),
 				fonts,
 			);
 			text.draw(
@@ -221,7 +232,12 @@ pub(super) fn draw_chord_panel(
 		|ctx, grid_bounds| {
 			let text = chord_text(
 				ctx,
-				&track_info.music_state(timestamp).music_state.chord,
+				track_info
+					.music_state(timestamp)
+					.music_state
+					.chord
+					.as_deref()
+					.unwrap_or("---"),
 				fonts,
 			);
 			text.draw(
@@ -273,6 +289,9 @@ fn chord_text(ctx: &mut Context, chord: &str, fonts: &Fonts) -> Text {
 }
 
 fn split_chord_str(chord: &str) -> Vec<(ChordTextFont, String)> {
+	if chord == PLACEHOLDER_STRING {
+		return vec![(ChordTextFont::Big, chord.to_string())];
+	}
 	let regex = Regex::new("([ABCDEFG][b#]?)(.*)").unwrap();
 	let captures = regex.captures(chord).expect("invalid chord");
 	let big_text = &captures[1];
