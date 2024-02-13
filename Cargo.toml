@@ -22,5 +22,8 @@ serde_with = "3.4.0"
 [build-dependencies]
 embed-manifest = "1.3.1"
 
+[features]
+sdl2_bundled = ["micro/sdl2_bundled"]
+
 [profile.dev]
 opt-level = 3
